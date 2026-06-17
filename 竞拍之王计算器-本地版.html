@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>竞拍之王计算器 - 本地版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #a0a0a0;
+            margin-bottom: 30px;
+        }
+
+        /* 标签页 */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .tab.active {
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+            color: #fff;
+        }
+
+        /* 主面板 */
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* 模式选择 */
+        .mode-selector {
+            margin-bottom: 30px;
+        }
+
+        .mode-selector h3 {
+            margin-bottom: 15px;
+            color: #f093fb;
+        }
+
+        .mode-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .mode-btn {
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+        }
+
+        .mode-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #f093fb;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%);
+            border-color: #f093fb;
+        }
+
+        .mode-btn .icon {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+
+        .mode-btn .name {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mode-btn .desc {
+            font-size: 0.85rem;
+            color: #a0a0a0;
+            margin-top: 5px;
+        }
+
+        /* 数据输入 */
+        .data-input {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 15px;
+        }
+
+        .input-group.purple {
+            border-left: 4px solid #a855f7;
+        }
+
+        .input-group.gold {
+            border-left: 4px solid #eab308;
+        }
+
+        .input-group.red {
+            border-left: 4px solid #ef4444;
+        }
+
+        .input-group h4 {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-group.purple h4 { color: #a855f7; }
+        .input-group.gold h4 { color: #eab308; }
+        .input-group.red h4 { color: #ef4444; }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .input-row label {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-row input {
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        .input-row input:focus {
+            outline: none;
+            border-color: #f093fb;
+        }
+
+        /* 计算按钮 */
+        .calculate-btn {
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 1.3rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-bottom: 30px;
+        }
+
+        .calculate-btn:hover {
+            transform: scale(1.02);
+        }
+
+        .calculate-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* 结果展示 */
+        .results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .result-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .result-card.main {
+            background: linear-gradient(135deg, rgba(240, 147, 251, 0.3) 0%, rgba(245, 87, 108, 0.3) 100%);
+            border: 2px solid #f093fb;
+        }
+
+        .result-card h5 {
+            color: #a0a0a0;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .result-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .result-card.main .value {
+            font-size: 3rem;
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .result-card .unit {
+            color: #a0a0a0;
+            font-size: 0.9rem;
+        }
+
+        .result-card.warning {
+            border: 2px solid #eab308;
+        }
+
+        .result-card.success {
+            border: 2px solid #22c55e;
+        }
+
+        /* 策略权重 */
+        .strategy-weights {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+        }
+
+        .strategy-weights h4 {
+            margin-bottom: 15px;
+            color: #f093fb;
+        }
+
+        .weight-bar {
+            display: flex;
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .weight-bar .count-weight {
+            background: linear-gradient(90deg, #3b82f6 0%, #6366f1 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: bold;
+            transition: width 0.3s;
+        }
+
+        .weight-bar .avg-weight {
+            background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: bold;
+            transition: width 0.3s;
+        }
+
+        /* 出价建议 */
+        .bid-suggestions {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+        }
+
+        .bid-suggestions h4 {
+            margin-bottom: 15px;
+            color: #f093fb;
+        }
+
+        .suggestions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .suggestion {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .suggestion.conservative { border-left: 4px solid #22c55e; }
+        .suggestion.stable { border-left: 4px solid #3b82f6; }
+        .suggestion.aggressive { border-left: 4px solid #f59e0b; }
+        .suggestion.max { border-left: 4px solid #ef4444; }
+
+        .suggestion .label {
+            color: #a0a0a0;
+            margin-bottom: 5px;
+        }
+
+        .suggestion .price {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .suggestion.conservative .price { color: #22c55e; }
+        .suggestion.stable .price { color: #3b82f6; }
+        .suggestion.aggressive .price { color: #f59e0b; }
+        .suggestion.max .price { color: #ef4444; }
+
+        /* 页脚 */
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #666;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8rem; }
+            .tabs { flex-wrap: wrap; }
+            .tab { flex: 1; text-align: center; }
+            .data-input { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 竞拍之王计算器</h1>
+        <p class="subtitle">智能估值 · 实时分析 · 精准出价</p>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('calculator')">🧮 计算器</button>
+            <button class="tab" onclick="switchTab('modes')">📊 五种模式</button>
+            <button class="tab" onclick="switchTab('guide')">📖 使用指南</button>
+        </div>
+
+        <!-- 计算器面板 -->
+        <div id="calculator-panel" class="panel">
+            <!-- 模式选择 -->
+            <div class="mode-selector">
+                <h3>🎮 选择游戏模式</h3>
+                <div class="mode-buttons">
+                    <button class="mode-btn" onclick="selectMode('express', this)">
+                        <div class="icon">📦</div>
+                        <div class="name">快递模式</div>
+                        <div class="desc">低风险 · 练习场</div>
+                    </button>
+                    <button class="mode-btn active" onclick="selectMode('container', this)">
+                        <div class="icon">🚢</div>
+                        <div class="name">集装箱模式</div>
+                        <div class="desc">平衡 · 新手推荐</div>
+                    </button>
+                    <button class="mode-btn" onclick="selectMode('villa', this)">
+                        <div class="icon">🏠</div>
+                        <div class="name">别墅模式</div>
+                        <div class="desc">中高风险 · 高回报</div>
+                    </button>
+                    <button class="mode-btn" onclick="selectMode('shipwreck', this)">
+                        <div class="icon">⚓</div>
+                        <div class="name">沉船模式</div>
+                        <div class="desc">冒险 · 额外掉落</div>
+                    </button>
+                    <button class="mode-btn" onclick="selectMode('secret', this)">
+                        <div class="icon">🔒</div>
+                        <div class="name">隐秘模式</div>
+                        <div class="desc">高风险 · 稀有奖励</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 数据输入 -->
+            <div class="data-input">
+                <div class="input-group purple">
+                    <h4>💜 紫色装备</h4>
+                    <div class="input-row">
+                        <label>
+                            件数
+                            <input type="number" id="purple-count" placeholder="0" min="0">
+                        </label>
+                        <label>
+                            格数
+                            <input type="number" id="purple-slots" placeholder="0" min="0">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="input-group gold">
+                    <h4>💛 金色装备</h4>
+                    <div class="input-row">
+                        <label>
+                            件数
+                            <input type="number" id="gold-count" placeholder="0" min="0">
+                        </label>
+                        <label>
+                            格数
+                            <input type="number" id="gold-slots" placeholder="0" min="0">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="input-group red">
+                    <h4>❤️ 红色装备</h4>
+                    <div class="input-row">
+                        <label>
+                            件数
+                            <input type="number" id="red-count" placeholder="0" min="0">
+                        </label>
+                        <label>
+                            格数
+                            <input type="number" id="red-slots" placeholder="0" min="0">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 计算按钮 -->
+            <button class="calculate-btn" onclick="calculate()">
+                🎯 开始计算估值
+            </button>
+
+            <!-- 结果展示 -->
+            <div class="results" id="results">
+                <div class="result-card main">
+                    <h5>综合估值</h5>
+                    <div class="value" id="total-value">0</div>
+                    <div class="unit">万</div>
+                </div>
+                <div class="result-card">
+                    <h5>件数流估值</h5>
+                    <div class="value" id="count-value">0</div>
+                    <div class="unit">万</div>
+                </div>
+                <div class="result-card">
+                    <h5>均格流估值</h5>
+                    <div class="value" id="avg-value">0</div>
+                    <div class="unit">万</div>
+                </div>
+            </div>
+
+            <!-- 策略权重 -->
+            <div class="strategy-weights">
+                <h4>⚖️ 策略权重</h4>
+                <div class="weight-bar" id="weight-bar">
+                    <div class="count-weight" id="count-weight-bar" style="width: 50%;">件数流 50%</div>
+                    <div class="avg-weight" id="avg-weight-bar" style="width: 50%;">均格流 50%</div>
+                </div>
+            </div>
+
+            <!-- 出价建议 -->
+            <div class="bid-suggestions">
+                <h4>💰 出价建议</h4>
+                <div class="suggestions-grid">
+                    <div class="suggestion conservative">
+                        <div class="label">🛡️ 保守</div>
+                        <div class="price" id="conservative-price">0万</div>
+                    </div>
+                    <div class="suggestion stable">
+                        <div class="label">⚖️ 稳健</div>
+                        <div class="price" id="stable-price">0万</div>
+                    </div>
+                    <div class="suggestion aggressive">
+                        <div class="label">🚀 激进</div>
+                        <div class="price" id="aggressive-price">0万</div>
+                    </div>
+                    <div class="suggestion max">
+                        <div class="label">⚡ 最高</div>
+                        <div class="price" id="max-price">0万</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 五种模式面板 -->
+        <div id="modes-panel" class="panel hidden">
+            <h2 style="margin-bottom: 30px; text-align: center;">🎮 五种游戏模式详解</h2>
+            
+            <div style="display: grid; gap: 20px;">
+                <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border-left: 4px solid #3b82f6;">
+                    <h3>📦 快递模式</h3>
+                    <p><strong>特点：</strong>小型快速模式，节奏紧凑，适合新手练习</p>
+                    <p><strong>金色估价：</strong>1.5-2.0万/件</p>
+                    <p><strong>红色估价：</strong>5-8万/件</p>
+                    <p><strong>策略：</strong>件数流70% + 均格流30%</p>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border-left: 4px solid #10b981;">
+                    <h3>🚢 集装箱模式</h3>
+                    <p><strong>特点：</strong>中等规模模式，平衡风险与收益，最为常见</p>
+                    <p><strong>金色估价：</strong>2.0-2.5万/件</p>
+                    <p><strong>红色估价：</strong>8-12万/件</p>
+                    <p><strong>策略：</strong>件数流50% + 均格流50%</p>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border-left: 4px solid #f59e0b;">
+                    <h3>🏠 别墅模式</h3>
+                    <p><strong>特点：</strong>大型豪华模式，奖励丰厚但竞争激烈</p>
+                    <p><strong>金色估价：</strong>3.0-4.0万/件</p>
+                    <p><strong>红色估价：</strong>15-20万/件</p>
+                    <p><strong>策略：</strong>件数流40% + 均格流60%</p>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border-left: 4px solid #6366f1;">
+                    <h3>⚓ 沉船模式</h3>
+                    <p><strong>特点：</strong>特殊探险模式，风险与机遇并存，可能有额外掉落</p>
+                    <p><strong>金色估价：</strong>2.5-3.5万/件</p>
+                    <p><strong>红色估价：</strong>12-18万/件</p>
+                    <p><strong>策略：</strong>件数流55% + 均格流45%</p>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border-left: 4px solid #ec4899;">
+                    <h3>🔒 隐秘模式</h3>
+                    <p><strong>特点：</strong>隐藏关卡模式，高风险高回报，稀有奖励</p>
+                    <p><strong>金色估价：</strong>3.0-5.0万/件</p>
+                    <p><strong>红色估价：</strong>18-25万/件</p>
+                    <p><strong>策略：</strong>件数流45% + 均格流55%</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 使用指南面板 -->
+        <div id="guide-panel" class="panel hidden">
+            <h2 style="margin-bottom: 30px; text-align: center;">📖 使用指南</h2>
+            
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 20px;">
+                <h3>🎯 如何使用计算器</h3>
+                <ol style="margin-top: 15px; line-height: 2;">
+                    <li><strong>选择模式：</strong>根据当前游戏选择对应的模式（快递/集装箱/别墅/沉船/隐秘）</li>
+                    <li><strong>输入数据：</strong>输入紫色、金色、红色装备的件数和格数</li>
+                    <li><strong>计算估值：</strong>点击"开始计算估值"按钮</li>
+                    <li><strong>参考出价：</strong>根据风险偏好选择保守/稳健/激进/最高出价</li>
+                </ol>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 20px;">
+                <h3>📊 估值方法说明</h3>
+                <ul style="margin-top: 15px; line-height: 2;">
+                    <li><strong>件数流：</strong>基于装备件数的估值方法</li>
+                    <li><strong>均格流：</strong>基于平均格数的估值方法</li>
+                    <li><strong>综合估值：</strong>件数流和均格流的加权平均</li>
+                </ul>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px;">
+                <h3>💡 出价策略建议</h3>
+                <ul style="margin-top: 15px; line-height: 2;">
+                    <li><strong>保守出价（×0.6）：</strong>低价捡漏，适合资金有限</li>
+                    <li><strong>稳健出价（×0.8）：</strong>安全边际，适合大多数情况</li>
+                    <li><strong>激进出价（×1.0）：</strong>正常价格，适合志在必得</li>
+                    <li><strong>最高出价（×1.2）：</strong>抢货专用，风险较高</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>🎯 竞拍之王计算器 v1.0 | 让你的竞拍更有策略！</p>
+            <p style="margin-top: 10px; font-size: 0.9rem; color: #888;">
+                本地版本 - 无需网络 · 即开即用
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // 模式配置
+        const MODE_CONFIG = {
+            express: {
+                name: '快递',
+                goldPrice: { min: 1.5, max: 2.0 },
+                redPrice: { min: 5, max: 8 },
+                goldPerSlot: 0.5,
+                redPerSlot: 3,
+                countWeight: 0.7,
+                avgWeight: 0.3
+            },
+            container: {
+                name: '集装箱',
+                goldPrice: { min: 2.0, max: 2.5 },
+                redPrice: { min: 8, max: 12 },
+                goldPerSlot: 0.7,
+                redPerSlot: 4,
+                countWeight: 0.5,
+                avgWeight: 0.5
+            },
+            villa: {
+                name: '别墅',
+                goldPrice: { min: 3.0, max: 4.0 },
+                redPrice: { min: 15, max: 20 },
+                goldPerSlot: 1.0,
+                redPerSlot: 8,
+                countWeight: 0.4,
+                avgWeight: 0.6
+            },
+            shipwreck: {
+                name: '沉船',
+                goldPrice: { min: 2.5, max: 3.5 },
+                redPrice: { min: 12, max: 18 },
+                goldPerSlot: 0.8,
+                redPerSlot: 6,
+                countWeight: 0.55,
+                avgWeight: 0.45
+            },
+            secret: {
+                name: '隐秘',
+                goldPrice: { min: 3.0, max: 5.0 },
+                redPrice: { min: 18, max: 25 },
+                goldPerSlot: 1.2,
+                redPerSlot: 10,
+                countWeight: 0.45,
+                avgWeight: 0.55
+            }
+        };
+
+        let currentMode = 'container';
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
+            document.getElementById(`${tab}-panel`).classList.remove('hidden');
+        }
+
+        function selectMode(mode, btnElement) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            (btnElement || event.target.closest('.mode-btn')).classList.add('active');
+            calculate();
+        }
+
+        function calculate() {
+            const config = MODE_CONFIG[currentMode];
+            
+            const purpleCount = parseInt(document.getElementById('purple-count').value) || 0;
+            const purpleSlots = parseInt(document.getElementById('purple-slots').value) || 0;
+            const goldCount = parseInt(document.getElementById('gold-count').value) || 0;
+            const goldSlots = parseInt(document.getElementById('gold-slots').value) || 0;
+            const redCount = parseInt(document.getElementById('red-count').value) || 0;
+            const redSlots = parseInt(document.getElementById('red-slots').value) || 0;
+
+            // 件数流估值
+            const goldValue = goldCount * ((config.goldPrice.min + config.goldPrice.max) / 2);
+            const redValue = redCount * ((config.redPrice.min + config.redPrice.max) / 2);
+            const countStreamValue = goldValue + redValue;
+
+            // 均格流估值
+            const goldAvgValue = goldSlots * config.goldPerSlot;
+            const redAvgValue = redSlots * config.redPerSlot;
+            const avgStreamValue = goldAvgValue + redAvgValue;
+
+            // 综合估值
+            const totalValue = countStreamValue * config.countWeight + avgStreamValue * config.avgWeight;
+
+            // 更新UI
+            document.getElementById('total-value').textContent = totalValue.toFixed(1);
+            document.getElementById('count-value').textContent = countStreamValue.toFixed(1);
+            document.getElementById('avg-value').textContent = avgStreamValue.toFixed(1);
+
+            // 更新权重条
+            const countPercent = config.countWeight * 100;
+            const avgPercent = config.avgWeight * 100;
+            document.getElementById('count-weight-bar').style.width = countPercent + '%';
+            document.getElementById('count-weight-bar').textContent = `件数流 ${countPercent.toFixed(0)}%`;
+            document.getElementById('avg-weight-bar').style.width = avgPercent + '%';
+            document.getElementById('avg-weight-bar').textContent = `均格流 ${avgPercent.toFixed(0)}%`;
+
+            // 出价建议
+            document.getElementById('conservative-price').textContent = (totalValue * 0.6).toFixed(1) + '万';
+            document.getElementById('stable-price').textContent = (totalValue * 0.8).toFixed(1) + '万';
+            document.getElementById('aggressive-price').textContent = totalValue.toFixed(1) + '万';
+            document.getElementById('max-price').textContent = (totalValue * 1.2).toFixed(1) + '万';
+        }
+
+        // 自动计算
+        ['purple-count', 'purple-slots', 'gold-count', 'gold-slots', 'red-count', 'red-slots'].forEach(id => {
+            document.getElementById(id).addEventListener('input', calculate);
+        });
+
+        // 初始计算
+        calculate();
+    </script>
+</body>
+</html>

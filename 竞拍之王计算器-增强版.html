@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>竞拍之王计算器 - 增强版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #a0a0a0;
+            font-size: 1.1rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            justify-content: center;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .tab.active {
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+            color: #fff;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card h3 {
+            margin-bottom: 15px;
+            color: #f093fb;
+            font-size: 1.2rem;
+        }
+
+        .mode-btn {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .mode-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #f093fb;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%);
+            border-color: #f093fb;
+        }
+
+        .mode-btn .icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .mode-btn .name {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mode-btn .desc {
+            font-size: 0.85rem;
+            color: #a0a0a0;
+            margin-top: 5px;
+        }
+
+        .char-btn {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+        }
+
+        .char-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #f59e0b;
+        }
+
+        .char-btn.active {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%);
+            border-color: #f59e0b;
+        }
+
+        .char-btn .name {
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        .char-btn .type {
+            font-size: 0.8rem;
+            color: #f59e0b;
+            margin-top: 5px;
+        }
+
+        .char-btn .desc {
+            font-size: 0.8rem;
+            color: #a0a0a0;
+            margin-top: 5px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #a0a0a0;
+            font-size: 0.9rem;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #f093fb;
+        }
+
+        .quality-card {
+            border-left: 4px solid;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .quality-card.purple { border-color: #a855f7; }
+        .quality-card.gold { border-color: #eab308; }
+        .quality-card.red { border-color: #ef4444; }
+
+        .quality-card h4 {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quality-card.purple h4 { color: #a855f7; }
+        .quality-card.gold h4 { color: #eab308; }
+        .quality-card.red h4 { color: #ef4444; }
+
+        .result-card {
+            text-align: center;
+            padding: 20px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .result-card.main {
+            background: linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%);
+            border: 2px solid #f093fb;
+        }
+
+        .result-card h5 {
+            color: #a0a0a0;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .result-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .result-card.main .value {
+            font-size: 3rem;
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .bid-card {
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid;
+        }
+
+        .bid-card.conservative { border-color: #22c55e; }
+        .bid-card.balanced { border-color: #3b82f6; }
+        .bid-card.aggressive { border-color: #f59e0b; }
+        .bid-card.max { border-color: #ef4444; }
+
+        .bid-card .label {
+            color: #a0a0a0;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .bid-card .price {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .bid-card.conservative .price { color: #22c55e; }
+        .bid-card.balanced .price { color: #3b82f6; }
+        .bid-card.aggressive .price { color: #f59e0b; }
+        .bid-card.max .price { color: #ef4444; }
+
+        .risk-indicator {
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .risk-indicator.low { background: rgba(34, 197, 94, 0.2); border: 1px solid #22c55e; }
+        .risk-indicator.medium { background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; }
+        .risk-indicator.high { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; }
+
+        .risk-indicator .level {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+        .risk-indicator.low .level { color: #22c55e; }
+        .risk-indicator.medium .level { color: #f59e0b; }
+        .risk-indicator.high .level { color: #ef4444; }
+
+        .risk-indicator .desc {
+            color: #a0a0a0;
+            font-size: 0.9rem;
+        }
+
+        .progress-bar {
+            height: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+            transition: width 0.3s;
+        }
+
+        .round-btns {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .round-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #666;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .round-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .round-btn.active {
+            background: #f59e0b;
+            border-color: #f59e0b;
+        }
+
+        .estimate-box {
+            padding: 15px;
+            background: rgba(168, 85, 247, 0.1);
+            border: 1px solid #a855f7;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .estimate-box h4 {
+            color: #a855f7;
+            margin-bottom: 10px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #666;
+        }
+
+        @media (max-width: 1024px) {
+            .grid-2, .grid-3, .grid-4 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 竞拍之王计算器 - 增强版</h1>
+            <p>基于精算流思想，精准估值，成为竞拍王者</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('calculator')">🧮 计算器</button>
+            <button class="tab" onclick="switchTab('guide')">📖 使用指南</button>
+        </div>
+
+        <div id="calculator-panel" class="panel">
+            <div class="grid grid-2">
+                <div>
+                    <div class="card">
+                        <h3>🎮 选择游戏模式</h3>
+                        <div class="grid grid-3" id="mode-buttons"></div>
+                    </div>
+
+                    <div class="card" style="margin-top: 20px;">
+                        <h3>👤 选择角色</h3>
+                        <div class="grid grid-2" id="char-buttons"></div>
+                    </div>
+
+                    <div class="card" style="margin-top: 20px;">
+                        <h3>📊 仓深信息</h3>
+                        <div class="grid grid-2">
+                            <div class="input-group">
+                                <label>总件数</label>
+                                <input type="number" id="total-items" placeholder="输入总件数" oninput="calculate()">
+                            </div>
+                            <div class="input-group">
+                                <label>总格数</label>
+                                <input type="number" id="total-slots" placeholder="输入总格数" oninput="calculate()">
+                            </div>
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <label style="display: block; margin-bottom: 10px; color: #a0a0a0;">当前回合</label>
+                            <div class="round-btns" id="round-buttons"></div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 20px;">
+                        <h3>💎 品质信息</h3>
+                        
+                        <div class="quality-card purple" style="margin-bottom: 15px;">
+                            <h4>💜 紫色</h4>
+                            <div class="grid grid-3">
+                                <div class="input-group">
+                                    <label>件数</label>
+                                    <input type="number" id="purple-count" placeholder="件数" oninput="calculate()">
+                                </div>
+                                <div class="input-group">
+                                    <label>格数</label>
+                                    <input type="number" id="purple-slots" placeholder="格数" oninput="calculate()">
+                                </div>
+                                <div class="input-group">
+                                    <label>均格</label>
+                                    <input type="number" step="0.01" id="purple-avg" placeholder="均格" oninput="calculate()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="quality-card gold" style="margin-bottom: 15px;">
+                            <h4>💛 金色</h4>
+                            <div class="grid grid-3">
+                                <div class="input-group">
+                                    <label>件数</label>
+                                    <input type="number" id="gold-count" placeholder="件数" oninput="calculate()">
+                                </div>
+                                <div class="input-group">
+                                    <label>格数</label>
+                                    <input type="number" id="gold-slots" placeholder="格数" oninput="calculate()">
+                                </div>
+                                <div class="input-group">
+                                    <label>均格</label>
+                                    <input type="number" step="0.01" id="gold-avg" placeholder="均格" oninput="calculate()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="quality-card red">
+                            <h4>❤️ 红色</h4>
+                            <div class="grid grid-3">
+                                <div class="input-group">
+                                    <label>件数</label>
+                                    <input type="number" id="red-count" placeholder="件数" oninput="calculate()">
+                                </div>
+                                <div class="input-group">
+                                    <label>格数</label>
+                                    <input type="number" id="red-slots" placeholder="格数" oninput="calculate()">
+                                </div>
+                                <div class="input-group">
+                                    <label>均格</label>
+                                    <input type="number" step="0.01" id="red-avg" placeholder="均格" oninput="calculate()">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="card">
+                        <h3>💰 估值结果</h3>
+                        <div class="grid grid-3" style="margin-bottom: 20px;">
+                            <div class="result-card">
+                                <h5>件数流估值</h5>
+                                <div class="value" id="item-value">0</div>
+                                <div style="color: #a0a0a0; font-size: 0.9rem;">万</div>
+                            </div>
+                            <div class="result-card main">
+                                <h5>综合估值</h5>
+                                <div class="value" id="combined-value">0</div>
+                                <div style="color: #a0a0a0; font-size: 0.9rem;">万</div>
+                            </div>
+                            <div class="result-card">
+                                <h5>均格流估值</h5>
+                                <div class="value" id="slot-value">0</div>
+                                <div style="color: #a0a0a0; font-size: 0.9rem;">万</div>
+                            </div>
+                        </div>
+
+                        <h3 style="margin-bottom: 15px;">🎯 出价建议</h3>
+                        <div class="grid grid-4" style="margin-bottom: 20px;">
+                            <div class="bid-card conservative">
+                                <div class="label">🛡️ 保守</div>
+                                <div class="price" id="conservative-bid">0万</div>
+                                <div style="color: #a0a0a0; font-size: 0.8rem; margin-top: 5px;">×0.6</div>
+                            </div>
+                            <div class="bid-card balanced">
+                                <div class="label">⚖️ 稳健</div>
+                                <div class="price" id="balanced-bid">0万</div>
+                                <div style="color: #a0a0a0; font-size: 0.8rem; margin-top: 5px;">×0.8</div>
+                            </div>
+                            <div class="bid-card aggressive">
+                                <div class="label">🚀 激进</div>
+                                <div class="price" id="aggressive-bid">0万</div>
+                                <div style="color: #a0a0a0; font-size: 0.8rem; margin-top: 5px;">×1.0</div>
+                            </div>
+                            <div class="bid-card max">
+                                <div class="label">⚡ 最高</div>
+                                <div class="price" id="max-bid">0万</div>
+                                <div style="color: #a0a0a0; font-size: 0.8rem; margin-top: 5px;">×1.2</div>
+                            </div>
+                        </div>
+
+                        <h3 style="margin-bottom: 15px;">⚠️ 风险评估</h3>
+                        <div id="risk-indicator" class="risk-indicator low">
+                            <div class="level">低风险</div>
+                            <div class="desc">信息完整度高，估值相对准确</div>
+                        </div>
+
+                        <div style="margin-top: 20px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span style="color: #a0a0a0;">信息完整度</span>
+                                <span id="completeness-text">0%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="completeness-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div id="estimate-box" class="estimate-box" style="display: none;">
+                            <h4>🔮 优品均格推算</h4>
+                            <p id="estimate-text"></p>
+                        </div>
+
+                        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <h4 style="margin-bottom: 10px; color: #f093fb;">⚖️ 策略权重</h4>
+                            <div class="grid grid-2">
+                                <div style="text-align: center;">
+                                    <div style="color: #3b82f6; font-weight: bold;" id="item-weight">50%</div>
+                                    <div style="color: #a0a0a0; font-size: 0.9rem;">件数流权重</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="color: #22c55e; font-weight: bold;" id="slot-weight">50%</div>
+                                    <div style="color: #a0a0a0; font-size: 0.9rem;">均格流权重</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="guide-panel" class="panel hidden">
+            <h2 style="margin-bottom: 30px; text-align: center;">📖 使用指南</h2>
+            
+            <div class="card" style="margin-bottom: 20px;">
+                <h3>🎯 快速开始</h3>
+                <ol style="margin-top: 15px; line-height: 2;">
+                    <li><strong>选择游戏模式</strong> - 根据当前游戏选择对应模式</li>
+                    <li><strong>选择角色</strong> - 选择你使用的角色（老头/艾莎/伊森/石油佬）</li>
+                    <li><strong>输入仓深信息</strong> - 输入总件数和总格数（可选但推荐）</li>
+                    <li><strong>输入品质信息</strong> - 输入紫/金/红装备的件数、格数或均格</li>
+                    <li><strong>查看结果</strong> - 自动计算估值和出价建议</li>
+                </ol>
+            </div>
+
+            <div class="card" style="margin-bottom: 20px;">
+                <h3>🎮 游戏模式说明</h3>
+                <div class="grid grid-2" style="margin-top: 15px;">
+                    <div style="padding: 15px; background: rgba(59, 130, 246, 0.1); border-radius: 10px;">
+                        <h4 style="color: #3b82f6; margin-bottom: 8px;">📦 快递模式</h4>
+                        <p style="color: #a0a0a0; font-size: 0.9rem;">小型快速模式，节奏紧凑，适合新手练习</p>
+                    </div>
+                    <div style="padding: 15px; background: rgba(16, 185, 129, 0.1); border-radius: 10px;">
+                        <h4 style="color: #10b981; margin-bottom: 8px;">🚢 集装箱模式</h4>
+                        <p style="color: #a0a0a0; font-size: 0.9rem;">中等规模模式，平衡风险与收益，最为常见</p>
+                    </div>
+                    <div style="padding: 15px; background: rgba(245, 158, 11, 0.1); border-radius: 10px;">
+                        <h4 style="color: #f59e0b; margin-bottom: 8px;">🏠 别墅模式</h4>
+                        <p style="color: #a0a0a0; font-size: 0.9rem;">大型豪华模式，奖励丰厚但竞争激烈</p>
+                    </div>
+                    <div style="padding: 15px; background: rgba(99, 102, 241, 0.1); border-radius: 10px;">
+                        <h4 style="color: #6366f1; margin-bottom: 8px;">⚓ 沉船模式</h4>
+                        <p style="color: #a0a0a0; font-size: 0.9rem;">特殊探险模式，风险与机遇并存</p>
+                    </div>
+                    <div style="padding: 15px; background: rgba(236, 72, 153, 0.1); border-radius: 10px; grid-column: 1 / -1;">
+                        <h4 style="color: #ec4899; margin-bottom: 8px;">🔒 隐秘模式</h4>
+                        <p style="color: #a0a0a0; font-size: 0.9rem;">隐藏关卡模式，高风险高回报，稀有奖励</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>👤 角色说明</h3>
+                <div class="grid grid-2" style="margin-top: 15px;">
+                    <div style="padding: 15px; background: rgba(245, 158, 11, 0.1); border-radius: 10px;">
+                        <h4 style="color: #f59e0b; margin-bottom: 8px;">老头（维克托）</h4>
+                        <p style="color: #a0a0a0; font-size: 0.9rem;">件数流角色，开局给紫或金总件数</p>
+                    </div>
+                    <div style="padding: 15px; background: rgba(245, 158, 11, 0.1); border-radius: 10px;">
+                        <h4 style="color: #f59e0b; margin-bottom: 8px;">艾莎</h4>
+                        <p style="color: #a0a0a0; font-size: 0.9rem;">均格流角色，测试服天王，发力期早</p>
+                    </div>
+                    <div style="padding: 15px; background: rgba(245, 158, 11, 0.1); border-radius: 10px;">
+                        <h4 style="color: #f59e0b; margin-bottom: 8px;">伊森</h4>
+                        <p style="color: #a0a0a0; font-size: 0.9rem;">均格流角色，穷哥们首选，自带看仓深</p>
+                    </div>
+                    <div style="padding: 15px; background: rgba(245, 158, 11, 0.1); border-radius: 10px;">
+                        <h4 style="color: #f59e0b; margin-bottom: 8px;">石油佬</h4>
+                        <p style="color: #a0a0a0; font-size: 0.9rem;">件数流角色，自带藏品数，每回合给金均格</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>🎯 竞拍之王计算器 - 增强版 | 基于精算流思想设计</p>
+            <p style="margin-top: 10px; font-size: 0.9rem; color: #888;">单文件版本 - 无需安装，即开即用</p>
+        </div>
+    </div>
+
+    <script>
+        const GAME_MODE_CONFIGS = {
+            express: {
+                name: '快递',
+                description: '小型快速模式，节奏紧凑',
+                icon: '📦',
+                itemValueRange: { gold: { min: 1.5, max: 2.0 }, red: { min: 5, max: 8 } },
+                slotValueRange: { gold: { min: 0.5, max: 0.7 }, red: { min: 3, max: 4 } },
+                recommendedWeight: { itemWeight: 0.6, slotWeight: 0.4 }
+            },
+            container: {
+                name: '集装箱',
+                description: '中等规模，平衡风险',
+                icon: '🚢',
+                itemValueRange: { gold: { min: 2.0, max: 2.5 }, red: { min: 8, max: 12 } },
+                slotValueRange: { gold: { min: 0.7, max: 0.9 }, red: { min: 4, max: 6 } },
+                recommendedWeight: { itemWeight: 0.5, slotWeight: 0.5 }
+            },
+            villa: {
+                name: '别墅',
+                description: '大型豪华，奖励丰厚',
+                icon: '🏠',
+                itemValueRange: { gold: { min: 3.0, max: 4.0 }, red: { min: 15, max: 20 } },
+                slotValueRange: { gold: { min: 1.0, max: 1.3 }, red: { min: 8, max: 12 } },
+                recommendedWeight: { itemWeight: 0.4, slotWeight: 0.6 }
+            },
+            shipwreck: {
+                name: '沉船',
+                description: '特殊探险，风险与机遇',
+                icon: '⚓',
+                itemValueRange: { gold: { min: 2.5, max: 3.5 }, red: { min: 12, max: 18 } },
+                slotValueRange: { gold: { min: 0.8, max: 1.1 }, red: { min: 6, max: 9 } },
+                recommendedWeight: { itemWeight: 0.55, slotWeight: 0.45 }
+            },
+            secret: {
+                name: '隐秘',
+                description: '隐藏关卡，高风险高回报',
+                icon: '🔒',
+                itemValueRange: { gold: { min: 3.0, max: 5.0 }, red: { min: 18, max: 25 } },
+                slotValueRange: { gold: { min: 1.2, max: 1.8 }, red: { min: 10, max: 15 } },
+                recommendedWeight: { itemWeight: 0.45, slotWeight: 0.55 }
+            }
+        };
+
+        const CHARACTERS = [
+            { id: 'victor', name: '老头（维克托）', type: '件数流', desc: '开局给紫或金总件数' },
+            { id: 'elsa', name: '艾莎', type: '均格流', desc: '测试服天王，发力期早' },
+            { id: 'ethan', name: '伊森', type: '均格流', desc: '穷哥们首选，自带看仓深' },
+            { id: 'oilman', name: '石油佬', type: '件数流', desc: '自带藏品数，每回合给金均格' }
+        ];
+
+        const ITEM_VALUE_STANDARD = {
+            purple: 0.6,
+            gold: 2.5,
+            red: 10
+        };
+
+        const SLOT_VALUE_STANDARD = {
+            purple: 0.2,
+            gold: 0.8,
+            red: 5
+        };
+
+        let currentMode = 'container';
+        let currentCharacter = null;
+        let currentRound = 1;
+
+        function init() {
+            const modeContainer = document.getElementById('mode-buttons');
+            Object.entries(GAME_MODE_CONFIGS).forEach(([key, config]) => {
+                const btn = document.createElement('button');
+                btn.className = 'mode-btn' + (key === 'container' ? ' active' : '');
+                btn.innerHTML = `
+                    <div class="icon">${config.icon}</div>
+                    <div class="name">${config.name}</div>
+                    <div class="desc">${config.description}</div>
+                `;
+                btn.onclick = () => selectMode(key);
+                modeContainer.appendChild(btn);
+            });
+
+            const charContainer = document.getElementById('char-buttons');
+            CHARACTERS.forEach(char => {
+                const btn = document.createElement('button');
+                btn.className = 'char-btn';
+                btn.innerHTML = `
+                    <div class="name">${char.name}</div>
+                    <div class="type">${char.type}</div>
+                    <div class="desc">${char.desc}</div>
+                `;
+                btn.onclick = () => selectCharacter(char.id);
+                charContainer.appendChild(btn);
+            });
+
+            const roundContainer = document.getElementById('round-buttons');
+            for (let i = 1; i <= 5; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'round-btn' + (i === 1 ? ' active' : '');
+                btn.textContent = i;
+                btn.onclick = () => selectRound(i);
+                roundContainer.appendChild(btn);
+            }
+
+            calculate();
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
+            document.getElementById(tab + '-panel').classList.remove('hidden');
+        }
+
+        function selectMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', Object.keys(GAME_MODE_CONFIGS)[i] === mode);
+            });
+            calculate();
+        }
+
+        function selectCharacter(charId) {
+            currentCharacter = currentCharacter === charId ? null : charId;
+            document.querySelectorAll('.char-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', CHARACTERS[i].id === charId);
+            });
+            calculate();
+        }
+
+        function selectRound(round) {
+            currentRound = round;
+            document.querySelectorAll('.round-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', i + 1 === round);
+            });
+        }
+
+        function getInputValue(id) {
+            const val = document.getElementById(id).value;
+            return val ? parseFloat(val) : undefined;
+        }
+
+        function estimatePurpleCount(avgSlots) {
+            for (let n = 1; n <= 20; n++) {
+                const product = avgSlots * n;
+                const decimal = product - Math.floor(product);
+                if (decimal >= 0.9 && decimal <= 1.09) {
+                    return { count: n, confidence: 0.9 };
+                }
+            }
+            const decimalPart = avgSlots - Math.floor(avgSlots);
+            if (Math.abs(decimalPart - 0.33) < 0.01 || Math.abs(decimalPart - 0.66) < 0.01) {
+                for (let n = 3; n <= 18; n += 3) {
+                    const product = avgSlots * n;
+                    if (Math.abs(product - Math.round(product)) < 0.1) {
+                        return { count: n, confidence: 0.7 };
+                    }
+                }
+            }
+            if (Math.abs(decimalPart - 0.25) < 0.01 || Math.abs(decimalPart - 0.75) < 0.01) {
+                for (let n = 4; n <= 20; n += 4) {
+                    const product = avgSlots * n;
+                    if (Math.abs(product - Math.round(product)) < 0.1) {
+                        return { count: n, confidence: 0.7 };
+                    }
+                }
+            }
+            return { count: 0, confidence: 0 };
+        }
+
+        function calculate() {
+            const purpleCount = getInputValue('purple-count');
+            const purpleSlots = getInputValue('purple-slots');
+            const purpleAvg = getInputValue('purple-avg');
+            const goldCount = getInputValue('gold-count');
+            const goldSlots = getInputValue('gold-slots');
+            const redCount = getInputValue('red-count');
+            const redSlots = getInputValue('red-slots');
+            const totalItems = getInputValue('total-items');
+            const totalSlots = getInputValue('total-slots');
+
+            const modeConfig = GAME_MODE_CONFIGS[currentMode];
+            const goldItemValue = (modeConfig.itemValueRange.gold.min + modeConfig.itemValueRange.gold.max) / 2;
+            const redItemValue = (modeConfig.itemValueRange.red.min + modeConfig.itemValueRange.red.max) / 2;
+            const goldSlotValue = (modeConfig.slotValueRange.gold.min + modeConfig.slotValueRange.gold.max) / 2;
+            const redSlotValue = (modeConfig.slotValueRange.red.min + modeConfig.slotValueRange.red.max) / 2;
+
+            let itemBasedValue = 0;
+            if (purpleCount) itemBasedValue += purpleCount * ITEM_VALUE_STANDARD.purple;
+            if (goldCount) itemBasedValue += goldCount * goldItemValue;
+            if (redCount) itemBasedValue += redCount * redItemValue;
+
+            let slotBasedValue = 0;
+            if (purpleSlots) slotBasedValue += purpleSlots * SLOT_VALUE_STANDARD.purple;
+            if (goldSlots) slotBasedValue += goldSlots * goldSlotValue;
+            if (redSlots) slotBasedValue += redSlots * redSlotValue;
+
+            let itemWeight = modeConfig.recommendedWeight.itemWeight;
+            let slotWeight = modeConfig.recommendedWeight.slotWeight;
+
+            if (currentCharacter) {
+                if (currentCharacter === 'victor' || currentCharacter === 'oilman') {
+                    itemWeight = Math.min(0.9, itemWeight + 0.2);
+                    slotWeight = 1 - itemWeight;
+                } else {
+                    slotWeight = Math.min(0.9, slotWeight + 0.2);
+                    itemWeight = 1 - slotWeight;
+                }
+            }
+
+            const combinedValue = itemBasedValue * itemWeight + slotBasedValue * slotWeight;
+
+            const conservativeBid = combinedValue * 0.6;
+            const balancedBid = combinedValue * 0.8;
+            const aggressiveBid = combinedValue * 1.0;
+            const maxBid = combinedValue * 1.2;
+
+            let completeness = 0;
+            let maxPoints = 0;
+            if (totalItems) { completeness += 15; }
+            if (totalSlots) { completeness += 15; }
+            maxPoints += 30;
+            if (purpleCount) completeness += 10;
+            if (purpleSlots) completeness += 10;
+            if (goldCount) completeness += 10;
+            if (goldSlots) completeness += 10;
+            if (redCount) completeness += 10;
+            if (redSlots) completeness += 10;
+            maxPoints += 60;
+            const infoCompleteness = Math.round((completeness / maxPoints) * 100);
+
+            let riskLevel, riskDesc;
+            if (infoCompleteness >= 70) {
+                riskLevel = 'low';
+                riskDesc = '信息完整度高，估值相对准确，风险较低';
+            } else if (infoCompleteness >= 40) {
+                riskLevel = 'medium';
+                riskDesc = '信息部分完整，估值有一定不确定性，风险中等';
+            } else {
+                riskLevel = 'high';
+                riskDesc = '信息不完整，估值误差较大，风险较高';
+            }
+
+            document.getElementById('item-value').textContent = itemBasedValue.toFixed(1);
+            document.getElementById('slot-value').textContent = slotBasedValue.toFixed(1);
+            document.getElementById('combined-value').textContent = combinedValue.toFixed(1);
+            document.getElementById('conservative-bid').textContent = conservativeBid.toFixed(1) + '万';
+            document.getElementById('balanced-bid').textContent = balancedBid.toFixed(1) + '万';
+            document.getElementById('aggressive-bid').textContent = aggressiveBid.toFixed(1) + '万';
+            document.getElementById('max-bid').textContent = maxBid.toFixed(1) + '万';
+
+            const riskIndicator = document.getElementById('risk-indicator');
+            riskIndicator.className = 'risk-indicator ' + riskLevel;
+            const riskText = riskLevel === 'low' ? '低风险' : riskLevel === 'medium' ? '中等风险' : '高风险';
+            riskIndicator.innerHTML = `<div class="level">${riskText}</div><div class="desc">${riskDesc}</div>`;
+
+            document.getElementById('completeness-text').textContent = infoCompleteness + '%';
+            document.getElementById('completeness-bar').style.width = infoCompleteness + '%';
+
+            document.getElementById('item-weight').textContent = Math.round(itemWeight * 100) + '%';
+            document.getElementById('slot-weight').textContent = Math.round(slotWeight * 100) + '%';
+
+            const estimateBox = document.getElementById('estimate-box');
+            if (purpleAvg && !purpleCount) {
+                const estimate = estimatePurpleCount(purpleAvg);
+                if (estimate.count > 0) {
+                    estimateBox.style.display = 'block';
+                    const confidenceText = estimate.confidence >= 0.9 ? '高' : '中等';
+                    document.getElementById('estimate-text').textContent = 
+                        `根据优品均格 ${purpleAvg}，推算紫色装备可能有 ${estimate.count} 件（置信度：${confidenceText}）`;
+                } else {
+                    estimateBox.style.display = 'none';
+                }
+            } else {
+                estimateBox.style.display = 'none';
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
