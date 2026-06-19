@@ -5,12 +5,27 @@ export interface QualityInfo {
   avgSlots?: number;       // 均格
 }
 
+// OCR检测的BidKing风格格子数据
+export interface OCRGridData {
+  T?: number;       // 总格数
+  B?: number;       // 蓝格数
+  WG?: number;      // 白绿格数
+  purpleAvg?: number; // 紫均格
+  purpleSlots?: number;
+  purpleCount?: number;
+  goldSlots?: number;
+  goldCount?: number;
+  goldAvg?: number;
+  redSlots?: number;
+  redCount?: number;
+}
+
 // 计算器输入数据
 export interface CalculatorInput {
   // 仓深信息
   totalItems?: number;     // 总件数
   totalSlots?: number;     // 总格数
-  
+
   // 各品质信息
   qualities: {
     white?: QualityInfo;    // 白色
@@ -20,7 +35,10 @@ export interface CalculatorInput {
     gold?: QualityInfo;     // 金色
     red?: QualityInfo;      // 红色
   };
-  
+
+  // OCR检测的格子数据 (BidKing风格)
+  ocrGridData?: OCRGridData;
+
   // 游戏信息
   round: number;           // 回合数
   currentBid?: number;     // 当前出价

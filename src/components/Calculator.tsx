@@ -46,13 +46,32 @@ export const Calculator: React.FC = () => {
           gold: { ...prev.qualities.gold, ...currentGame.qualities.gold },
           red: { ...prev.qualities.red, ...currentGame.qualities.red },
         };
+
+        // OCR检测的BidKing风格格子数据 → 映射到input
+        const ga = currentGame.gridActuarial;
+        let ocrGridData = prev.ocrGridData;
+        if (ga && Object.keys(ga).length > 0) {
+          ocrGridData = { ...prev.ocrGridData, ...ga };
+
+          // 自动填充品质字段 (仅当手填为空时)
+          if (ga.purpleAvg && !mergedQualities.purple.avgSlots) mergedQualities.purple.avgSlots = ga.purpleAvg;
+          if (ga.purpleSlots && !mergedQualities.purple.slots) mergedQualities.purple.slots = ga.purpleSlots;
+          if (ga.purpleCount && !mergedQualities.purple.count) mergedQualities.purple.count = ga.purpleCount;
+          if (ga.goldSlots && !mergedQualities.gold.slots) mergedQualities.gold.slots = ga.goldSlots;
+          if (ga.goldCount && !mergedQualities.gold.count) mergedQualities.gold.count = ga.goldCount;
+          if (ga.goldAvg && !mergedQualities.gold.avgSlots) mergedQualities.gold.avgSlots = ga.goldAvg;
+          if (ga.redSlots && !mergedQualities.red.slots) mergedQualities.red.slots = ga.redSlots;
+          if (ga.redCount && !mergedQualities.red.count) mergedQualities.red.count = ga.redCount;
+        }
+
         return {
           ...prev,
           round: currentGame.currentRound,
           character: currentGame.character as any,
           totalItems: currentGame.warehouseInfo?.totalItems,
-          totalSlots: currentGame.warehouseInfo?.totalSlots,
+          totalSlots: currentGame.warehouseInfo?.totalSlots ?? (ga?.T || undefined),
           qualities: mergedQualities,
+          ocrGridData: ocrGridData,
         };
       });
     }

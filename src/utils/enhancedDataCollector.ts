@@ -225,8 +225,42 @@ export class EnhancedOCRProcessor {
     return text
       .replace(/\s+/g, ' ')
       .replace(/[^\w\s\u4e00-\u9fa5\.]/g, '')
-      .trim()
-      .toLowerCase();
+      .trim();
+    // 不改小写: 中文字符需要原样匹配OCR文本
+  }
+
+  // BidKing风格正则: 从OCR文本提取T/B/WG/purpleAvg
+  private static BIDKING_PATTERNS: Record<string, RegExp[]> = {
+    T: [
+      /所有藏品[^0-9色]{0,25}?(\d{1,4})\s*格/,
+      /总仓储[^0-9]{0,20}?(\d{1,4})\s*格/,
+    ],
+    B: [
+      /所有蓝色品质藏品[^0-9]{0,25}?(\d{1,4})\s*格/,
+      /蓝色[^0-9]{0,25}?(\d{1,4})\s*格/,
+    ],
+    WG: [
+      /所有白色[和与及]?绿色品质藏品[^0-9]{0,25}?(\d{1,4})\s*格/,
+      /白色[和与及\s]*绿色[^0-9]{0,25}?(\d{1,4})\s*格/,
+    ],
+    purpleAvg: [
+      /所有紫色品质藏品平均[^0-9]{0,10}?(\d+\.?\d*)\s*格/,
+      /紫色[^0-9]{0,20}?平均[^0-9]{0,10}?(\d+\.?\d*)\s*格/,
+    ],
+  };
+
+  private matchBidKingPatterns(text: string): { T?: number; B?: number; WG?: number; purpleAvg?: number } {
+    const result: any = {};
+    for (const [key, patterns] of Object.entries(EnhancedOCRProcessor.BIDKING_PATTERNS)) {
+      for (const p of patterns) {
+        const m = p.exec(text);
+        if (m) {
+          result[key] = key === 'purpleAvg' ? parseFloat(m[1]) : parseInt(m[1], 10);
+          break;
+        }
+      }
+    }
+    return result;
   }
 
   private parseQualityData(text: string, quality: string): any {
@@ -295,6 +329,13 @@ export class EnhancedOCRProcessor {
       result.totalSlots = numbers[1];
     }
 
+    // 用BidKing正则提取T、B、WG、purpleAvg
+    const bidking = this.matchBidKingPatterns(text);
+    if (bidking.T !== undefined) result.totalSlots = bidking.T;
+    if (bidking.B !== undefined) result.blueSlots = bidking.B;
+    if (bidking.WG !== undefined) result.whiteGreenSlots = bidking.WG;
+    if (bidking.purpleAvg !== undefined) result.purpleAvg = bidking.purpleAvg;
+
     return result;
   }
 
@@ -331,21 +372,36 @@ export class EnhancedOCRProcessor {
 
 export class GameDataExtractor {
   static extractGameData(data: any, areaType: string): any {
-    const gameData: any = {};
+    const gameData: any = { gridActuarial: {} };
 
     switch (areaType) {
       case 'purple':
+        gameData.qualities = { purple: data };
+        if (data.avgSlots) gameData.gridActuarial.purpleAvg = data.avgSlots;
+        if (data.slots) gameData.gridActuarial.purpleSlots = data.slots;
+        if (data.count) gameData.gridActuarial.purpleCount = data.count;
+        break;
       case 'gold':
+        gameData.qualities = { gold: data };
+        if (data.avgSlots) gameData.gridActuarial.goldAvg = data.avgSlots;
+        if (data.slots) gameData.gridActuarial.goldSlots = data.slots;
+        if (data.count) gameData.gridActuarial.goldCount = data.count;
+        break;
       case 'red':
-        gameData.qualities = {
-          [areaType]: data
-        };
+        gameData.qualities = { red: data };
+        if (data.slots) gameData.gridActuarial.redSlots = data.slots;
+        if (data.count) gameData.gridActuarial.redCount = data.count;
         break;
       case 'warehouse':
-        gameData.warehouseInfo = data;
+        gameData.warehouseInfo = { totalItems: data.totalItems, totalSlots: data.totalSlots };
+        if (data.totalSlots) gameData.gridActuarial.T = data.totalSlots;
+        if (data.blueSlots) gameData.gridActuarial.B = data.blueSlots;
+        if (data.whiteGreenSlots) gameData.gridActuarial.WG = data.whiteGreenSlots;
+        if (data.purpleAvg) gameData.gridActuarial.purpleAvg = data.purpleAvg;
         break;
       case 'price':
         gameData.currentBid = data.price;
+        if (data.price) gameData.gridActuarial.price = data.price;
         break;
     }
 

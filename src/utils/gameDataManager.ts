@@ -1,6 +1,23 @@
 // 游戏数据管理模块
 import { create } from 'zustand';
 
+// 数格子精算OCR字段 (BidKing风格)
+export interface GridActuarialOCR {
+  T?: number;      // 总格数 (总仓储空间)
+  B?: number;      // 蓝色格数 (良品扫描)
+  WG?: number;     // 白绿格数 (普品扫描)
+  purpleAvg?: number;  // 紫色平均格数
+  purpleSlots?: number;
+  purpleCount?: number;
+  goldSlots?: number;
+  goldCount?: number;
+  goldAvg?: number;
+  redSlots?: number;
+  redCount?: number;
+  totalItems?: number;
+  price?: number;
+}
+
 // 游戏对局数据结构
 export interface GameRound {
   id: string;
@@ -20,6 +37,8 @@ export interface GameRound {
     totalItems?: number;
     totalSlots?: number;
   };
+  // 数格子精算OCR检测数据 (BidKing风格)
+  gridActuarial?: GridActuarialOCR;
   bids: {
     round: number;
     myBid: number;
@@ -115,6 +134,10 @@ export const useGameDataStore = create<GameDataStore>((set, get) => ({
           warehouseInfo: {
             ...state.currentGame.warehouseInfo,
             ...data.warehouseInfo,
+          },
+          gridActuarial: {
+            ...state.currentGame.gridActuarial,
+            ...data.gridActuarial,
           },
         },
       };

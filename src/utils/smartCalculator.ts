@@ -473,25 +473,34 @@ export interface SmartCalculatorOutput extends CalculatorOutput {
 
 // 从 CalculatorInput 提取格子数据给精算模式
 function extractGridActuarialInput(input: CalculatorInput): GridActuarialInput | null {
-  const totalSlots = input.totalSlots;
-  const blueSlots = input.qualities.blue?.slots;
+  const ocr = input.ocrGridData;
+
+  // 优先使用用户手动输入, 其次使用OCR检测数据
+  const totalSlots = input.totalSlots ?? ocr?.T;
+  const blueSlots = input.qualities.blue?.slots ?? ocr?.B;
   const whiteSlots = input.qualities.white?.slots || 0;
   const greenSlots = input.qualities.green?.slots || 0;
-  const wgSlots = whiteSlots + greenSlots;
+  const wgSlots = (whiteSlots + greenSlots) || ocr?.WG || 0;
 
-  // 精算模式需要总格数、蓝格数、白绿格数
   if (!totalSlots) return null;
+
+  const purpleAvg = input.qualities.purple?.avgSlots ?? ocr?.purpleAvg ?? null;
+  const purpleSlots = input.qualities.purple?.slots ?? ocr?.purpleSlots ?? null;
+  const purpleCount = input.qualities.purple?.count ?? ocr?.purpleCount ?? null;
+  const goldSlots = input.qualities.gold?.slots ?? ocr?.goldSlots ?? null;
+  const goldCount = input.qualities.gold?.count ?? ocr?.goldCount ?? null;
+  const goldAvg = input.qualities.gold?.avgSlots ?? ocr?.goldAvg ?? null;
 
   return {
     T: totalSlots,
     B: blueSlots || 0,
-    WG: wgSlots,
-    purpleTotalGrids: input.qualities.purple?.slots ?? null,
-    purpleCount: input.qualities.purple?.count ?? null,
-    purpleAvg: input.qualities.purple?.avgSlots ?? null,
-    goldTotalGrids: input.qualities.gold?.slots ?? null,
-    goldCount: input.qualities.gold?.count ?? null,
-    goldAvg: input.qualities.gold?.avgSlots ?? null,
+    WG: wgSlots || 0,
+    purpleTotalGrids: purpleSlots ?? null,
+    purpleCount: purpleCount ?? null,
+    purpleAvg: purpleAvg ?? null,
+    goldTotalGrids: goldSlots ?? null,
+    goldCount: goldCount ?? null,
+    goldAvg: goldAvg ?? null,
   };
 }
 
