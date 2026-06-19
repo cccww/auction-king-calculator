@@ -1,91 +1,64 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  Video, 
-  Scan, 
-  Settings, 
-  Eye, 
-  EyeOff, 
-  Zap, 
-  StopCircle,
-  Target,
-  Palette,
-  Download,
-  Maximize2,
-  Trash2,
-  Activity
-} from 'lucide-react';
+import { Video, Scan, Eye, EyeOff, Zap, StopCircle, Activity } from 'lucide-react';
 import { useGameDataStore } from '../utils/gameDataManager';
 import { EnhancedOCRProcessor, GameDataExtractor } from '../utils/enhancedDataCollector';
 
-interface DetectionArea {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  name: string;
-  type: 'purple' | 'gold' | 'red' | 'warehouse' | 'price' | 'custom';
-  enabled: boolean;
-}
-
-interface OCRResult {
-  text: string;
+// 全屏OCR解析结果 (BidKing风格字段)
+interface OCRParseResult {
+  T?: number;       // 总格数
+  B?: number;       // 蓝格数
+  WG?: number;      // 白绿格数
+  purpleAvg?: number;
+  purpleSlots?: number;
+  purpleCount?: number;
+  goldSlots?: number;
+  goldCount?: number;
+  goldAvg?: number;
+  redSlots?: number;
+  redCount?: number;
+  totalItems?: number;
+  price?: number;
+  rawText: string;
   confidence: number;
-  area: DetectionArea;
   timestamp: number;
-  data?: any;
 }
 
 export const RealtimeOCRDetector: React.FC = () => {
   const [isDetecting, setIsDetecting] = useState(false);
   const [isPreviewVisible, setIsPreviewVisible] = useState(true);
-  const [detectionAreas, setDetectionAreas] = useState<DetectionArea[]>([
-    { x: 100, y: 100, width: 200, height: 100, name: '紫色区域', type: 'purple', enabled: true },
-    { x: 100, y: 220, width: 200, height: 100, name: '金色区域', type: 'gold', enabled: true },
-    { x: 100, y: 340, width: 200, height: 100, name: '红色区域', type: 'red', enabled: true },
-  ]);
-  const [detectionResults, setDetectionResults] = useState<OCRResult[]>([]);
-  const [selectedAreaIndex, setSelectedAreaIndex] = useState<number>(-1);
-  const [detectionInterval, setDetectionInterval] = useState(1000);
-  const [showSettings, setShowSettings] = useState(false);
+  const [parsedResults, setParsedResults] = useState<OCRParseResult | null>(null);
+  const [lastRawText, setLastRawText] = useState('');
+  const [detectionInterval, setDetectionInterval] = useState(3000);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [ocrStatus, setOcrStatus] = useState<'idle' | 'initializing' | 'ready' | 'error'>('idle');
   const [captureLoading, setCaptureLoading] = useState(false);
+  const [ocrHistory, setOcrHistory] = useState<{ text: string; time: string }[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const ocrProcessorRef = useRef<EnhancedOCRProcessor | null>(null);
   const detectionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isDetectingRef = useRef(false); // 用 ref 避免闭包陷阱
+  const isDetectingRef = useRef(false);
 
   const { updateGameData, startNewGame, currentGame } = useGameDataStore();
 
-  // 确保有游戏在进行
   useEffect(() => {
-    if (!currentGame) {
-      startNewGame();
-    }
+    if (!currentGame) startNewGame();
   }, []);
 
-  // 初始化OCR处理器
+  // 初始化OCR
   useEffect(() => {
     setOcrStatus('initializing');
     const processor = new EnhancedOCRProcessor();
     ocrProcessorRef.current = processor;
     processor.initialize()
-      .then(() => {
-        setOcrStatus('ready');
-        console.log('OCR初始化成功');
-      })
+      .then(() => { setOcrStatus('ready'); })
       .catch((err) => {
         setOcrStatus('error');
-        console.error('OCR初始化失败:', err);
         showNotification('OCR初始化失败: ' + (err.message || '未知错误'), 'error');
       });
-
-    return () => {
-      cleanup();
-    };
+    return () => cleanup();
   }, []);
 
   const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
@@ -99,14 +72,12 @@ export const RealtimeOCRDetector: React.FC = () => {
     setCaptureLoading(true);
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: 'monitor' },
+        video: { displaySurface: 'monitor' } as any,
         audio: false,
-        preferCurrentTab: false,
-      } as any);
+      });
 
       streamRef.current = stream;
       stream.getVideoTracks()[0].onended = () => {
-        // 用户停止了屏幕分享（点击浏览器的"停止共享"）
         stopDetection();
         showNotification('屏幕分享已停止', 'info');
       };
@@ -116,50 +87,37 @@ export const RealtimeOCRDetector: React.FC = () => {
         await videoRef.current.play();
       }
 
-      showNotification('屏幕捕获已启动 ✅ 现在点击"开始检测"', 'success');
+      showNotification('屏幕捕获已启动 ✅ 点击"开始检测"', 'success');
       setCaptureLoading(false);
       return true;
     } catch (error) {
       setCaptureLoading(false);
       const err = error as Error;
       if (err.name === 'NotAllowedError') {
-        showNotification(
-          '⚠️ 屏幕分享被取消。请在弹出窗口中选择要捕获的窗口（游戏/BidKing），然后点击"允许"或"分享"',
-          'error'
-        );
-      } else if (err.name === 'NotFoundError') {
-        showNotification('⚠️ 未找到可捕获的屏幕内容，请确保有显示器/窗口可用', 'error');
+        showNotification('请在弹出窗口中选择要捕获的窗口，然后点击"分享"', 'error');
       } else {
-        showNotification('⚠️ 屏幕捕获失败: ' + err.message, 'error');
+        showNotification('屏幕捕获失败: ' + err.message, 'error');
       }
       return false;
     }
   };
 
-  // 开始实时检测
+  // 开始全屏检测
   const startDetection = async () => {
     if (!streamRef.current) {
       const ok = await startCapture();
       if (!ok) return;
     }
-
     if (ocrStatus !== 'ready') {
-      showNotification('OCR引擎尚未就绪，请稍候...', 'info');
-      if (ocrStatus === 'error') {
-        showNotification('OCR引擎初始化失败，请刷新页面重试', 'error');
-        return;
-      }
-      // 等待初始化完成
+      showNotification(ocrStatus === 'error' ? 'OCR引擎初始化失败' : 'OCR引擎加载中，请稍候...', 'info');
       return;
     }
-
     isDetectingRef.current = true;
     setIsDetecting(true);
-    showNotification('实时检测已启动', 'success');
+    showNotification('全屏OCR检测已启动（每' + detectionInterval / 1000 + '秒一次）', 'success');
     runDetectionLoopRef();
   };
 
-  // 停止检测
   const stopDetection = () => {
     isDetectingRef.current = false;
     setIsDetecting(false);
@@ -170,25 +128,21 @@ export const RealtimeOCRDetector: React.FC = () => {
     showNotification('检测已停止', 'info');
   };
 
-  // 清理资源
   const cleanup = () => {
     stopDetection();
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
-    if (ocrProcessorRef.current) {
-      ocrProcessorRef.current.cleanup();
-    }
+    ocrProcessorRef.current?.cleanup();
   };
 
-  // 用 ref 保存检测循环函数，避免闭包陷阱
+  // 全屏OCR检测循环 (BidKing风格: 截图→OCR→正则提取全部字段)
   const runDetectionLoopRef = useCallback(async () => {
     if (!isDetectingRef.current) return;
     if (!videoRef.current || !canvasRef.current || !ocrProcessorRef.current) {
-      if (isDetectingRef.current) {
+      if (isDetectingRef.current)
         detectionTimerRef.current = setTimeout(runDetectionLoopRef, 500);
-      }
       return;
     }
 
@@ -198,475 +152,207 @@ export const RealtimeOCRDetector: React.FC = () => {
 
       canvasRef.current.width = videoRef.current.videoWidth;
       canvasRef.current.height = videoRef.current.videoHeight;
-
       ctx.drawImage(videoRef.current, 0, 0);
 
-      for (const area of detectionAreas) {
-        if (!area.enabled || !isDetectingRef.current) break;
+      // 全屏OCR (类型warehouse = 使用BidKing正则)
+      const result = await ocrProcessorRef.current.detectArea(canvasRef.current, 'warehouse');
 
-        const areaCanvas = document.createElement('canvas');
-        areaCanvas.width = area.width;
-        areaCanvas.height = area.height;
-        const areaCtx = areaCanvas.getContext('2d');
+      if (result.text.trim()) {
+        const fullText = result.text.trim();
+        const now = new Date().toLocaleTimeString();
+        setLastRawText(fullText);
+        setOcrHistory(prev => [{ text: fullText.slice(0, 200), time: now }, ...prev].slice(0, 20));
 
-        if (areaCtx) {
-          areaCtx.drawImage(
-            canvasRef.current,
-            area.x, area.y, area.width, area.height,
-            0, 0, area.width, area.height
-          );
+        const parsed: OCRParseResult = {
+          rawText: fullText, confidence: result.confidence, timestamp: Date.now(),
+        };
 
-          try {
-            const result = await ocrProcessorRef.current.detectArea(areaCanvas, area.type);
+        if (result.data) {
+          if (result.data.totalSlots) parsed.T = result.data.totalSlots;
+          if (result.data.blueSlots) parsed.B = result.data.blueSlots;
+          if (result.data.whiteGreenSlots) parsed.WG = result.data.whiteGreenSlots;
+          if (result.data.purpleAvg) parsed.purpleAvg = result.data.purpleAvg;
+          if (result.data.totalItems) parsed.totalItems = result.data.totalItems;
+          if (result.data.purpleSlots) parsed.purpleSlots = result.data.purpleSlots;
+          if (result.data.purpleCount) parsed.purpleCount = result.data.purpleCount;
+          if (result.data.goldSlots) parsed.goldSlots = result.data.goldSlots;
+          if (result.data.goldCount) parsed.goldCount = result.data.goldCount;
+          if (result.data.goldAvg) parsed.goldAvg = result.data.goldAvg;
+          if (result.data.redSlots) parsed.redSlots = result.data.redSlots;
+          if (result.data.redCount) parsed.redCount = result.data.redCount;
+          if (result.data.price) parsed.price = result.data.price;
+          setParsedResults(parsed);
 
-            if (result.text.trim()) {
-              const newResult: OCRResult = {
-                text: result.text,
-                confidence: result.confidence,
-                area: area,
-                timestamp: Date.now(),
-                data: result.data,
-              };
+          // 存入游戏数据
+          const gameData: any = { gridActuarial: {} };
+          const ga = gameData.gridActuarial;
+          if (parsed.T) { ga.T = parsed.T; gameData.warehouseInfo = { ...gameData.warehouseInfo, totalSlots: parsed.T }; }
+          if (parsed.B) ga.B = parsed.B;
+          if (parsed.WG) ga.WG = parsed.WG;
+          if (parsed.purpleAvg) ga.purpleAvg = parsed.purpleAvg;
+          if (parsed.purpleSlots) ga.purpleSlots = parsed.purpleSlots;
+          if (parsed.purpleCount) ga.purpleCount = parsed.purpleCount;
+          if (parsed.goldSlots) ga.goldSlots = parsed.goldSlots;
+          if (parsed.goldCount) ga.goldCount = parsed.goldCount;
+          if (parsed.goldAvg) ga.goldAvg = parsed.goldAvg;
+          if (parsed.redSlots) ga.redSlots = parsed.redSlots;
+          if (parsed.redCount) ga.redCount = parsed.redCount;
+          if (parsed.totalItems) gameData.warehouseInfo = { ...gameData.warehouseInfo, totalItems: parsed.totalItems };
 
-              setDetectionResults(prev => {
-                const updated = [...prev, newResult];
-                return updated.slice(-50);
-              });
-
-              if (result.data) {
-                const gameData = GameDataExtractor.extractGameData(result.data, area.type);
-                console.log('提取的游戏数据:', gameData);
-                updateGameData(gameData);
-              }
-            }
-          } catch (e) {
-            console.error('区域检测错误:', area.name, e);
-          }
+          if (Object.keys(ga).length > 0) updateGameData(gameData);
         }
       }
     } catch (error) {
-      console.error('检测循环错误:', error);
+      console.error('OCR检测错误:', error);
     }
 
-    if (isDetectingRef.current) {
+    if (isDetectingRef.current)
       detectionTimerRef.current = setTimeout(runDetectionLoopRef, detectionInterval);
-    }
-  }, [detectionAreas, detectionInterval, updateGameData]);
+  }, [detectionInterval, updateGameData]);
 
-  // 更新检测区域
-  const updateArea = (index: number, updates: Partial<DetectionArea>) => {
-    setDetectionAreas(prev => prev.map((area, i) => 
-      i === index ? { ...area, ...updates } : area
-    ));
-  };
-
-  // 添加新检测区域
-  const addArea = (customArea?: Partial<DetectionArea>) => {
-    const newArea: DetectionArea = {
-      x: customArea?.x ?? 100,
-      y: customArea?.y ?? (100 + detectionAreas.length * 120),
-      width: customArea?.width ?? 200,
-      height: customArea?.height ?? 100,
-      name: customArea?.name ?? `区域 ${detectionAreas.length + 1}`,
-      type: customArea?.type ?? 'custom',
-      enabled: customArea?.enabled ?? true
-    };
-    setDetectionAreas(prev => [...prev, newArea]);
-  };
-
-  // 删除检测区域
-  const removeArea = (index: number) => {
-    setDetectionAreas(prev => prev.filter((_, i) => i !== index));
-    if (selectedAreaIndex === index) {
-      setSelectedAreaIndex(-1);
-    }
-  };
-
-  // 导出检测结果
-  const exportResults = () => {
-    const data = JSON.stringify(detectionResults, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ocr_detection_results_${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showNotification('检测结果已导出', 'success');
-  };
-
-  const getTypeColor = (type: string) => {
-    const colors: Record<string, string> = {
-      purple: 'bg-purple-500',
-      gold: 'bg-yellow-500',
-      red: 'bg-red-500',
-      warehouse: 'bg-blue-500',
-      price: 'bg-green-500',
-      custom: 'bg-gray-500'
-    };
-    return colors[type] || colors.custom;
-  };
-
-  const getTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      purple: '紫色',
-      gold: '金色',
-      red: '红色',
-      warehouse: '仓库',
-      price: '价格',
-      custom: '自定义'
-    };
-    return labels[type] || type;
-  };
+  // 格式化数值
+  const fmt = (v: number | undefined | null, unit = '') => v ? v + unit : '—';
 
   return (
     <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
-      {/* 通知 */}
       {notification && (
         <div className={`mb-4 p-3 rounded-lg ${
           notification.type === 'success' ? 'bg-green-500/30 text-green-200' :
-          notification.type === 'error' ? 'bg-red-500/30 text-red-200' :
-          'bg-blue-500/30 text-blue-200'
-        }`}>
-          {notification.message}
-        </div>
+          notification.type === 'error' ? 'bg-red-500/30 text-red-200' : 'bg-blue-500/30 text-blue-200'
+        }`}>{notification.message}</div>
       )}
 
-      {/* 标题栏 */}
-      <div className="flex items-center justify-between mb-6">
+      {/* 标题 */}
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-white flex items-center gap-2">
           <Scan className="w-5 h-5" />
-          实时OCR检测工具
+          全屏OCR检测 (BidKing风格)
         </h2>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-        >
-          <Settings className="w-5 h-5 text-gray-400" />
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">
+            OCR: {ocrStatus === 'ready' ? '✅ 就绪' : ocrStatus === 'initializing' ? '⏳ 加载中...' : '❌ 错误'}
+          </span>
+          <span className="text-xs text-gray-400">
+            间隔: {detectionInterval / 1000}s
+          </span>
+        </div>
       </div>
 
       {/* 使用说明 */}
       <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm text-blue-200 space-y-1">
-        <div className="font-medium text-blue-100 mb-1">📖 使用步骤：</div>
-        <div>1️⃣ 点击「📺 启动屏幕捕获」按钮</div>
-        <div>2️⃣ 在弹出的窗口中 <strong className="text-yellow-200">选择《竞拍之王》游戏窗口或整个屏幕</strong>，然后点击"分享"</div>
-        <div>3️⃣ 游戏画面显示后，点击「▶ 开始检测」自动识别</div>
-        <div className="text-blue-300/70 text-xs mt-1">💡 如果弹出窗口未出现，请检查浏览器是否阻止了弹窗</div>
+        <div className="font-medium text-blue-100">📖 使用步骤：</div>
+        <div>1️⃣ 点击 <strong className="text-yellow-200">「📺 启动屏幕捕获」</strong> → 选择游戏窗口</div>
+        <div>2️⃣ 点击 <strong className="text-yellow-200">「▶ 开始检测」</strong> → 自动全屏OCR</div>
+        <div>3️⃣ 切换 <strong className="text-yellow-200">「计算器」</strong> 标签 → 开启 <strong className="text-yellow-200">精算模式</strong> 查看估值</div>
       </div>
 
-      {/* 控制面板 */}
+      {/* 控制按钮 */}
       <div className="flex gap-3 mb-6">
         {captureLoading ? (
           <button disabled className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg cursor-wait">
-            <Video className="w-4 h-4 animate-pulse" />
-            请选择窗口...
+            <Video className="w-4 h-4 animate-pulse" /> 请选择窗口...
           </button>
         ) : !streamRef.current ? (
-          <button
-            onClick={startCapture}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-lg shadow-blue-600/30"
-          >
-            <Video className="w-4 h-4" />
-            📺 启动屏幕捕获
+          <button onClick={startCapture}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg shadow-blue-600/30">
+            <Video className="w-4 h-4" /> 📺 启动屏幕捕获
           </button>
         ) : !isDetecting ? (
-          <button
-            onClick={startDetection}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-lg shadow-green-600/30"
-          >
-            <Zap className="w-4 h-4" />
-            ▶ 开始检测
+          <button onClick={startDetection}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-lg shadow-green-600/30">
+            <Zap className="w-4 h-4" /> ▶ 开始检测
           </button>
         ) : (
-          <button
-            onClick={stopDetection}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-          >
-            <StopCircle className="w-4 h-4" />
-            ⏹ 停止检测
+          <button onClick={stopDetection}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">
+            <StopCircle className="w-4 h-4" /> ⏹ 停止检测
           </button>
         )}
-
-        <button
-          onClick={() => setIsPreviewVisible(!isPreviewVisible)}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-        >
+        <button onClick={() => setIsPreviewVisible(!isPreviewVisible)}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg">
           {isPreviewVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           {isPreviewVisible ? '隐藏预览' : '显示预览'}
         </button>
-
-        <button
-          onClick={exportResults}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
-        >
-          <Download className="w-4 h-4" />
-          导出结果
-        </button>
       </div>
 
-      {/* 主内容区 */}
+      {/* 主内容 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 视频预览区 */}
+        {/* 视频预览 */}
         <div className="lg:col-span-2">
           {isPreviewVisible && (
-            <div className="relative bg-black/50 rounded-lg overflow-hidden">
-              <video
-                ref={videoRef}
-                className="w-full"
-                style={{ aspectRatio: '16/9' }}
-              />
+            <div className="bg-black/50 rounded-lg overflow-hidden">
+              <video ref={videoRef} className="w-full" style={{ aspectRatio: '16/9' }} />
               <canvas ref={canvasRef} className="hidden" />
-              
-              {/* 检测区域叠加层 */}
-              <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                {detectionAreas.map((area, index) => (
-                  <div
-                    key={index}
-                    className={`absolute border-2 ${
-                      selectedAreaIndex === index ? 'border-white' : 'border-transparent'
-                    } ${area.enabled ? 'opacity-80' : 'opacity-30'}`}
-                    style={{
-                      left: `${(area.x / (canvasRef.current?.width || 1920)) * 100}%`,
-                      top: `${(area.y / (canvasRef.current?.height || 1080)) * 100}%`,
-                      width: `${(area.width / (canvasRef.current?.width || 1920)) * 100}%`,
-                      height: `${(area.height / (canvasRef.current?.height || 1080)) * 100}%`,
-                      backgroundColor: area.enabled ? `${getTypeColor(area.type)}33` : 'transparent',
-                    }}
-                  >
-                    <div className="absolute -top-6 left-0 text-xs text-white bg-black/50 px-2 py-1 rounded">
-                      {area.name}
-                    </div>
+            </div>
+          )}
+
+          {/* OCR历史记录 */}
+          {ocrHistory.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                <Activity className="w-4 h-4" /> OCR识别记录
+              </h3>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {ocrHistory.slice(0, 10).map((h, i) => (
+                  <div key={i} className="text-xs text-gray-400 bg-white/5 p-2 rounded">
+                    <span className="text-gray-500">[{h.time}]</span> {h.text}
                   </div>
                 ))}
               </div>
             </div>
           )}
-
-          {/* 检测结果 */}
-          <div className="mt-4">
-            <h3 className="text-lg font-medium text-white mb-3 flex items-center gap-2">
-              <Activity className="w-4 h-4" />
-              检测结果 ({detectionResults.length})
-            </h3>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {detectionResults.slice().reverse().map((result, index) => (
-                <div key={index} className="p-3 bg-white/5 rounded-lg border border-gray-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${getTypeColor(result.area.type)}`} />
-                      <span className="text-sm text-gray-300">{result.area.name}</span>
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {new Date(result.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <div className="text-white text-sm mb-1">{result.text}</div>
-                  <div className="text-xs text-gray-400">
-                    置信度: {(result.confidence * 100).toFixed(1)}%
-                  </div>
-                  {result.data && (
-                    <div className="mt-2 text-xs text-green-400">
-                      {JSON.stringify(result.data)}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {detectionResults.length === 0 && (
-                <div className="text-center text-gray-500 py-8">
-                  暂无检测结果
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
-        {/* 检测区域配置 */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-medium text-white flex items-center gap-2">
-              <Target className="w-4 h-4" />
-              检测区域
-            </h3>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  addArea({ type: 'purple', x: 0, y: 0, width: 300, height: 150, name: '紫色区域 (0,0,300,150)' });
-                  showNotification('已添加默认紫色区域', 'success');
-                }}
-                className="p-1.5 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-                title="添加默认紫色区域"
-              >
-                <span className="text-white text-xs px-2">默认紫色</span>
-              </button>
-              <button
-                onClick={() => {
-                  addArea({ type: 'gold', x: 310, y: 0, width: 300, height: 150, name: '金色区域 (310,0,300,150)' });
-                  showNotification('已添加默认金色区域', 'success');
-                }}
-                className="p-1.5 bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors"
-                title="添加默认金色区域"
-              >
-                <span className="text-white text-xs px-2">默认金色</span>
-              </button>
-              <button
-                onClick={() => {
-                  addArea({ type: 'red', x: 620, y: 0, width: 300, height: 150, name: '红色区域 (620,0,300,150)' });
-                  showNotification('已添加默认红色区域', 'success');
-                }}
-                className="p-1.5 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-                title="添加默认红色区域"
-              >
-                <span className="text-white text-xs px-2">默认红色</span>
-              </button>
-              <button
-                onClick={() => addArea()}
-                className="p-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                title="添加新区域"
-              >
-                <Maximize2 className="w-4 h-4 text-white" />
-              </button>
-            </div>
-          </div>
+        {/* 解析结果 */}
+        <div className="space-y-3">
+          <h3 className="text-lg font-medium text-white flex items-center gap-2">
+            <Activity className="w-4 h-4" />
+            OCR解析结果
+          </h3>
 
-          <div className="space-y-3">
-            {detectionAreas.map((area, index) => (
-              <div
-                key={index}
-                className={`p-3 rounded-lg border transition-all ${
-                  selectedAreaIndex === index 
-                    ? 'bg-amber-500/20 border-amber-500' 
-                    : 'bg-white/5 border-gray-700'
-                }`}
-                onClick={() => setSelectedAreaIndex(index)}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-3 h-3 rounded-full ${getTypeColor(area.type)}`} />
-                    <span className="text-sm font-medium text-white">{area.name}</span>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeArea(index);
-                    }}
-                    className="p-1 hover:bg-red-500/20 rounded transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3 text-gray-400" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">X</label>
-                    <input
-                      type="number"
-                      value={area.x}
-                      onChange={(e) => updateArea(index, { x: parseInt(e.target.value) || 0 })}
-                      className="w-full px-2 py-1 bg-white/10 border border-gray-600 rounded text-white text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">Y</label>
-                    <input
-                      type="number"
-                      value={area.y}
-                      onChange={(e) => updateArea(index, { y: parseInt(e.target.value) || 0 })}
-                      className="w-full px-2 py-1 bg-white/10 border border-gray-600 rounded text-white text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">宽度</label>
-                    <input
-                      type="number"
-                      value={area.width}
-                      onChange={(e) => updateArea(index, { width: parseInt(e.target.value) || 0 })}
-                      className="w-full px-2 py-1 bg-white/10 border border-gray-600 rounded text-white text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">高度</label>
-                    <input
-                      type="number"
-                      value={area.height}
-                      onChange={(e) => updateArea(index, { height: parseInt(e.target.value) || 0 })}
-                      className="w-full px-2 py-1 bg-white/10 border border-gray-600 rounded text-white text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">类型</label>
-                    <select
-                      value={area.type}
-                      onChange={(e) => updateArea(index, { type: e.target.value as any })}
-                      className="w-full px-2 py-1 bg-white/10 border border-gray-600 rounded text-white text-sm"
-                    >
-                      <option value="purple">紫色</option>
-                      <option value="gold">金色</option>
-                      <option value="red">红色</option>
-                      <option value="warehouse">仓库</option>
-                      <option value="price">价格</option>
-                      <option value="custom">自定义</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">启用</label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={area.enabled}
-                        onChange={(e) => updateArea(index, { enabled: e.target.checked })}
-                        className="w-4 h-4"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">区域名称</label>
-                  <input
-                    type="text"
-                    value={area.name}
-                    onChange={(e) => updateArea(index, { name: e.target.value })}
-                    className="w-full px-2 py-1 bg-white/10 border border-gray-600 rounded text-white text-sm"
-                  />
+          {parsedResults ? (
+            <>
+              {/* BidKing关键字段 */}
+              <div className="bg-purple-900/20 rounded-lg p-3 border border-purple-500/30">
+                <h4 className="text-sm font-medium text-purple-300 mb-2">📐 数格子精算字段</h4>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div><span className="text-gray-400">总格数T:</span> <span className="text-white font-bold">{fmt(parsedResults.T)}</span></div>
+                  <div><span className="text-gray-400">蓝格数B:</span> <span className="text-white">{fmt(parsedResults.B)}</span></div>
+                  <div><span className="text-gray-400">白绿格数WG:</span> <span className="text-white">{fmt(parsedResults.WG)}</span></div>
+                  <div><span className="text-gray-400">紫均格:</span> <span className="text-white">{fmt(parsedResults.purpleAvg)}</span></div>
+                  <div><span className="text-gray-400">紫格/件:</span> <span className="text-white">{fmt(parsedResults.purpleSlots)}/{fmt(parsedResults.purpleCount)}</span></div>
+                  <div><span className="text-gray-400">金格/件:</span> <span className="text-white">{fmt(parsedResults.goldSlots)}/{fmt(parsedResults.goldCount)}</span></div>
+                  {parsedResults.goldAvg && <div><span className="text-gray-400">金均格:</span> <span className="text-white">{fmt(parsedResults.goldAvg)}</span></div>}
+                  <div><span className="text-gray-400">红格/件:</span> <span className="text-white">{fmt(parsedResults.redSlots)}/{fmt(parsedResults.redCount)}</span></div>
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* 设置面板 */}
-          {showSettings && (
-            <div className="mt-4 p-4 bg-white/5 rounded-lg border border-gray-700">
-              <h4 className="text-md font-medium text-white mb-3 flex items-center gap-2">
-                <Settings className="w-4 h-4" />
-                检测设置
-              </h4>
-              
-              <div className="mb-3">
-                <label className="block text-sm text-gray-400 mb-1">
-                  检测间隔 (ms)
-                </label>
-                <input
-                  type="range"
-                  min="500"
-                  max="5000"
-                  step="500"
-                  value={detectionInterval}
-                  onChange={(e) => setDetectionInterval(parseInt(e.target.value))}
-                  className="w-full"
-                />
-                <div className="text-center text-gray-300 text-sm">{detectionInterval}ms</div>
-              </div>
+              {/* 仓库信息 */}
+              {(parsedResults.totalItems || parsedResults.T) && (
+                <div className="bg-blue-900/20 rounded-lg p-3 border border-blue-500/30">
+                  <h4 className="text-sm font-medium text-blue-300 mb-2">📦 仓库信息</h4>
+                  <div className="text-xs space-y-1">
+                    {parsedResults.totalItems && <div><span className="text-gray-400">总件数:</span> <span className="text-white">{parsedResults.totalItems}</span></div>}
+                    {parsedResults.T && <div><span className="text-gray-400">总格数:</span> <span className="text-white">{parsedResults.T}</span></div>}
+                    {parsedResults.confidence > 0 && <div><span className="text-gray-400">置信度:</span> <span className="text-white">{(parsedResults.confidence * 100).toFixed(1)}%</span></div>}
+                    <div className="text-gray-500">{new Date(parsedResults.timestamp).toLocaleTimeString()}</div>
+                  </div>
+                </div>
+              )}
 
-              <div className="p-3 bg-amber-500/20 rounded-lg text-sm text-amber-200">
-                <p>💡 提示：</p>
-                <p className="mt-1">1. 启动屏幕捕获后选择游戏窗口</p>
-                <p>2. 调整检测区域位置和大小</p>
-                <p>3. 开始检测后会自动识别数据</p>
+              {/* 操作提示 */}
+              <div className="bg-green-900/20 rounded-lg p-3 border border-green-500/30 text-sm text-green-200">
+                ✅ 数据已自动同步到计算器
+                <div className="text-xs text-green-300 mt-1">
+                  切换到「计算器」标签，开启「精算模式」查看估值
+                </div>
               </div>
+            </>
+          ) : (
+            <div className="text-center text-gray-500 py-12">
+              <Scan className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>等待OCR检测...</p>
+              <p className="text-xs mt-2">启动屏幕捕获后点击"开始检测"</p>
             </div>
           )}
         </div>
