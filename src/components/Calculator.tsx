@@ -425,7 +425,8 @@ export const Calculator: React.FC = () => {
         </div>
       </div>
 
-      {activeTab === 'calculator' && (
+      {/* 标签内容：隐藏而非卸载，保持OCR持续运行 */}
+      <div style={{ display: activeTab === 'calculator' ? 'block' : 'none' }}>
         <div className="relative z-10">
           {/* 顶部：模式和角色选择 */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -761,10 +762,14 @@ export const Calculator: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {activeTab === 'data' && <DataInputPanel />}
-      {activeTab === 'analytics' && <AnalyticsPanel />}
+      <div style={{ display: activeTab === 'data' ? 'block' : 'none' }}>
+        <DataInputPanel />
+      </div>
+      <div style={{ display: activeTab === 'analytics' ? 'block' : 'none' }}>
+        <AnalyticsPanel />
+      </div>
 
       {/* 真实价格输入模态框 */}
       {showActualPriceModal && (
