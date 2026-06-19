@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Gavel, Calculator as CalculatorIcon, Database, BarChart3, Trash2, History } from 'lucide-react';
+import { Gavel, Calculator as CalculatorIcon, Database, BarChart3, Trash2, History, Settings, ToggleLeft, ToggleRight } from 'lucide-react';
 import { CalculatorInput, formatCurrency, GameMode, GAME_MODE_CONFIGS } from '../utils/calculator';
 import { smartCalculate, SmartCalculatorOutput, historicalDataManager } from '../utils/smartCalculator';
 import { useGameDataStore } from '../utils/gameDataManager';
@@ -7,6 +7,7 @@ import { useCollectionStore } from '../utils/collectionManager';
 import { ResultPanel } from './ResultPanel';
 import { DataInputPanel } from './DataInputPanel';
 import { AnalyticsPanel } from './AnalyticsPanel';
+import { GridPrices, loadGridPrices, saveGridPrices, PRICE_LABELS, silverToWan } from '../utils/gridPrices';
 
 type TabType = 'calculator' | 'data' | 'analytics';
 
@@ -28,6 +29,8 @@ export const Calculator: React.FC = () => {
   const [actualPrice, setActualPrice] = useState<string>('');
   const [pendingSaveData, setPendingSaveData] = useState<any>(null);
   const [premiumTotalCount, setPremiumTotalCount] = useState<number | undefined>(undefined);
+  const [actuarialMode, setActuarialMode] = useState(() => localStorage.getItem('auction_king_actuarial_mode') === 'true');
+  const [showPriceConfig, setShowPriceConfig] = useState(false);
 
   const { currentGame, updateGameData } = useGameDataStore();
   const { addRecord } = useCollectionStore();
@@ -168,6 +171,7 @@ export const Calculator: React.FC = () => {
     });
 
     addRecord({
+      status: 'completed',
       mode: pendingSaveData.mode,
       character: pendingSaveData.character,
       round: pendingSaveData.round,
@@ -201,7 +205,8 @@ export const Calculator: React.FC = () => {
   };
 
   const handleValuation = () => {
-    const recordData = {
+    const recordData: any = {
+      status: 'completed' as const,
       mode: input.mode || 'express',
       character: input.character || 'victor',
       round: input.round,
@@ -701,8 +706,39 @@ export const Calculator: React.FC = () => {
             </div>
 
             {/* 估价结果 - 右侧 */}
-            <div className="xl:col-span-1">
-              <ResultPanel result={result} />
+            <div className="xl:col-span-1 space-y-3">
+              {/* 精算模式切换 + 价格配置 */}
+              <div className="glass-card p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <button
+                    onClick={() => {
+                      const newMode = !actuarialMode;
+                      setActuarialMode(newMode);
+                      localStorage.setItem('auction_king_actuarial_mode', String(newMode));
+                    }}
+                    className={`flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg transition-all ${
+                      actuarialMode
+                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                        : 'bg-white/5 text-gray-400 border border-gray-700'
+                    }`}
+                  >
+                    {actuarialMode ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                    {actuarialMode ? '精算模式' : '简单模式'}
+                  </button>
+                  <button
+                    onClick={() => setShowPriceConfig(!showPriceConfig)}
+                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    <Settings className="w-3 h-3" />
+                    单格价
+                  </button>
+                </div>
+
+                {/* 价格配置 */}
+                {showPriceConfig && <PriceConfigPanel />}
+              </div>
+
+              <ResultPanel result={result} actuarialMode={actuarialMode} />
             </div>
           </div>
         </div>
@@ -798,6 +834,49 @@ export const Calculator: React.FC = () => {
         <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-cyber-primary/10 rounded-full blur-3xl animate-float"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyber-secondary/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }}></div>
         <div className="absolute top-1/2 right-1/3 w-48 h-48 bg-cyber-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }}></div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== 单格估价价格配置面板 ====================
+const PriceConfigPanel: React.FC = () => {
+  const [prices, setPrices] = useState<GridPrices>(loadGridPrices);
+
+  const updatePrice = (key: keyof GridPrices, wanValue: number) => {
+    // 用户输入的是"万"单位, 存储时转回"银"
+    const silverValue = Math.round(wanValue * 10000);
+    const newPrices = { ...prices, [key]: silverValue };
+    setPrices(newPrices);
+    saveGridPrices(newPrices);
+  };
+
+  const priceEntries: Array<{ key: keyof GridPrices; label: string }> = [
+    { key: 'vWG', label: '白绿' },
+    { key: 'vB', label: '蓝' },
+    { key: 'vP', label: '紫' },
+    { key: 'vJR', label: '金红混' },
+    { key: 'vG', label: '金' },
+    { key: 'vR', label: '红' },
+  ];
+
+  return (
+    <div className="space-y-1.5 pt-1">
+      {priceEntries.map(({ key, label }) => (
+        <div key={key} className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 w-12">{label}</span>
+          <input
+            type="number"
+            step="0.01"
+            value={silverToWan(prices[key]).toFixed(2)}
+            onChange={(e) => updatePrice(key, parseFloat(e.target.value) || 0)}
+            className="cyber-input text-center text-xs w-20 h-6"
+          />
+          <span className="text-xs text-gray-500">万/格</span>
+        </div>
+      ))}
+      <div className="text-[10px] text-gray-600 pt-1 border-t border-gray-700 mt-1">
+        参考: BidKing 默认白绿100银/蓝800银/紫2000银/金红混20000银/金10000银/红30000银
       </div>
     </div>
   );

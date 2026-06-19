@@ -5,9 +5,10 @@ import { formatCurrency } from '../utils/calculator';
 
 interface ResultPanelProps {
   result: SmartCalculatorOutput | null;
+  actuarialMode?: boolean;
 }
 
-export const ResultPanel: React.FC<ResultPanelProps> = ({ result }) => {
+export const ResultPanel: React.FC<ResultPanelProps> = ({ result, actuarialMode = false }) => {
   if (!result) {
     return (
       <div className="text-center py-12">
@@ -19,6 +20,9 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({ result }) => {
       </div>
     );
   }
+
+  // 数格子精算结果
+  const ga = result.gridActuarial;
 
   const riskColors = {
     low: {
@@ -66,6 +70,40 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({ result }) => {
           💡 {result.finalRecommendation.suggestion}
         </div>
       </div>
+
+      {/* 数格子精算估值范围 (精算模式下显示) */}
+      {actuarialMode && ga && ga.output.valueRange && (
+        <div className="glass-card p-4 border-l-4 border-purple-500">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-purple-500/20 rounded-lg">
+              <Layers className="w-6 h-6 text-purple-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">数格子精算估值</h3>
+              <p className="text-sm text-gray-400">基于所有候选组合的范围估值</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="bg-purple-900/20 rounded p-2 text-center">
+              <div className="text-xs text-gray-400">最低</div>
+              <div className="text-lg font-bold text-purple-300">{formatCurrency(ga.output.valueRange.min)}</div>
+            </div>
+            <div className="bg-purple-900/20 rounded p-2 text-center">
+              <div className="text-xs text-gray-400">中位</div>
+              <div className="text-lg font-bold text-purple-400">{formatCurrency(ga.output.valueRange.median)}</div>
+            </div>
+            <div className="bg-purple-900/20 rounded p-2 text-center">
+              <div className="text-xs text-gray-400">最高</div>
+              <div className="text-lg font-bold text-purple-300">{formatCurrency(ga.output.valueRange.max)}</div>
+            </div>
+          </div>
+          <div className="text-xs text-gray-500 space-y-1">
+            <div>紫色候选 {ga.output.purpleCandidates.length} 组</div>
+            {ga.output.goldEnabled && <div>金色候选 {ga.output.goldCandidates.length} 组</div>}
+            <div>紫 {ga.purpleTotalGrids}格 / 金 {ga.goldTotalGrids}格 / 红 {ga.redTotalGrids}格</div>
+          </div>
+        </div>
+      )}
 
       {/* 估值分解 */}
       <div className="glass-card p-4">

@@ -1,4 +1,6 @@
 import { CalculatorInput, CalculatorOutput, GameMode, GAME_MODE_CONFIGS } from './calculator';
+import { computeGridActuarial, GridActuarialInput, GridActuarialOutput, CandidatePair, computeSingleEstimate } from './gridActuarial';
+import { loadGridPrices } from './gridPrices';
 
 // ==================== 1. 完整的品质估值标准 ====================
 export const QUALITY_VALUE_STANDARDS = {
@@ -433,17 +435,17 @@ export const historicalDataManager = new HistoricalDataManager();
 export interface SmartCalculatorOutput extends CalculatorOutput {
   // 仓深修正
   warehouseAdjustment: WarehouseAdjustment;
-  
+
   // 风险调整
   riskAdjustment: RiskAdjustment;
-  
+
   // 历史学习调整
   historicalAdjustment?: {
     adjustedValue: number;
     adjustmentFactor: number;
     confidence: number;
   };
-  
+
   // 最终建议
   finalRecommendation: {
     value: number;
@@ -451,13 +453,45 @@ export interface SmartCalculatorOutput extends CalculatorOutput {
     confidence: number;
     suggestion: string;
   };
-  
+
   // 详细分解
   valueBreakdown: {
     baseValue: number;
     warehouseBonus: number;
     riskDiscount: number;
     historyBonus: number;
+  };
+
+  // ===== 数格子精算模式 =====
+  gridActuarial?: {
+    output: GridActuarialOutput;
+    purpleTotalGrids: number;
+    goldTotalGrids: number;
+    redTotalGrids: number;
+  } | null;
+}
+
+// 从 CalculatorInput 提取格子数据给精算模式
+function extractGridActuarialInput(input: CalculatorInput): GridActuarialInput | null {
+  const totalSlots = input.totalSlots;
+  const blueSlots = input.qualities.blue?.slots;
+  const whiteSlots = input.qualities.white?.slots || 0;
+  const greenSlots = input.qualities.green?.slots || 0;
+  const wgSlots = whiteSlots + greenSlots;
+
+  // 精算模式需要总格数、蓝格数、白绿格数
+  if (!totalSlots) return null;
+
+  return {
+    T: totalSlots,
+    B: blueSlots || 0,
+    WG: wgSlots,
+    purpleTotalGrids: input.qualities.purple?.slots ?? null,
+    purpleCount: input.qualities.purple?.count ?? null,
+    purpleAvg: input.qualities.purple?.avgSlots ?? null,
+    goldTotalGrids: input.qualities.gold?.slots ?? null,
+    goldCount: input.qualities.gold?.count ?? null,
+    goldAvg: input.qualities.gold?.avgSlots ?? null,
   };
 }
 
@@ -569,6 +603,31 @@ export function smartCalculate(input: CalculatorInput): SmartCalculatorOutput {
     };
   });
 
+  // 8b. 数格子精算模式
+  const gridInput = extractGridActuarialInput(input);
+  const gridActuarialResult = gridInput ? computeGridActuarial(gridInput) : null;
+
+  // 如果精算有结果, 用其范围更新 finalRecommendation
+  let gridActuarialData = null;
+  if (gridActuarialResult && gridActuarialResult.valueRange) {
+    // 取选中候选的信息
+    const pc = gridActuarialResult.purpleCandidates[0];
+    const gc = gridActuarialResult.goldCandidates[0] || null;
+    const prices = loadGridPrices();
+    const estimate = pc ? computeSingleEstimate(gridInput!, pc, gc, {
+      vWG: prices.vWG, vB: prices.vB, vP: prices.vP,
+      vJR: prices.vJR, vG: prices.vG, vR: prices.vR,
+      T: gridInput!.T, B: gridInput!.B, WG: gridInput!.WG,
+    }) : null;
+
+    gridActuarialData = {
+      output: gridActuarialResult,
+      purpleTotalGrids: estimate?.purpleGrids ?? 0,
+      goldTotalGrids: estimate?.goldGrids ?? 0,
+      redTotalGrids: estimate?.redGrids ?? 0,
+    };
+  }
+
   // 生成建议
   let suggestion = '';
   if (riskAdjustment.riskLevel === 'low') {
@@ -598,6 +657,7 @@ export function smartCalculate(input: CalculatorInput): SmartCalculatorOutput {
     warehouseAdjustment,
     riskAdjustment,
     historicalAdjustment,
+    gridActuarial: gridActuarialData,
     finalRecommendation: {
       value: finalValue,
       range: riskAdjustment.suggestedRange,

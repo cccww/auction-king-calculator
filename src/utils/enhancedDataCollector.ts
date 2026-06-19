@@ -160,6 +160,18 @@ export class EnhancedOCRProcessor {
         dataUrl = canvasOrDataUrl;
       }
 
+      // 图像预处理 (灰度+对比度增强)
+      if (typeof canvasOrDataUrl !== 'string') {
+        try {
+          const grayCanvas = ImagePreprocessor.preprocessImage(canvasOrDataUrl);
+          const enhancedCanvas = ImagePreprocessor.enhanceContrast(grayCanvas);
+          dataUrl = enhancedCanvas.toDataURL();
+          logger.info('OCR', '图像预处理完成 (灰度+对比度增强)');
+        } catch (e) {
+          logger.warn('OCR', '图像预处理失败, 使用原图', e);
+        }
+      }
+
       logger.info('OCR', `开始OCR识别`);
       const result = await this.worker.recognize(dataUrl);
       const text = result.data.text;
