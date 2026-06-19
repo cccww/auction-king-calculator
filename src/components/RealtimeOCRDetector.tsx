@@ -48,12 +48,14 @@ export const RealtimeOCRDetector: React.FC = () => {
   const [detectionInterval, setDetectionInterval] = useState(1000);
   const [showSettings, setShowSettings] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [ocrStatus, setOcrStatus] = useState<'idle' | 'initializing' | 'ready' | 'error'>('idle');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const ocrProcessorRef = useRef<EnhancedOCRProcessor | null>(null);
   const detectionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isDetectingRef = useRef(false); // 用 ref 避免闭包陷阱
 
   const { updateGameData, startNewGame, currentGame } = useGameDataStore();
 
@@ -66,11 +68,19 @@ export const RealtimeOCRDetector: React.FC = () => {
 
   // 初始化OCR处理器
   useEffect(() => {
-    ocrProcessorRef.current = new EnhancedOCRProcessor();
-    ocrProcessorRef.current.initialize().catch(err => {
-      console.error('OCR初始化失败:', err);
-      showNotification('OCR初始化失败，请刷新重试', 'error');
-    });
+    setOcrStatus('initializing');
+    const processor = new EnhancedOCRProcessor();
+    ocrProcessorRef.current = processor;
+    processor.initialize()
+      .then(() => {
+        setOcrStatus('ready');
+        console.log('OCR初始化成功');
+      })
+      .catch((err) => {
+        setOcrStatus('error');
+        console.error('OCR初始化失败:', err);
+        showNotification('OCR初始化失败: ' + (err.message || '未知错误'), 'error');
+      });
 
     return () => {
       cleanup();
@@ -83,7 +93,7 @@ export const RealtimeOCRDetector: React.FC = () => {
   };
 
   // 启动屏幕捕获
-  const startCapture = async () => {
+  const startCapture = async (): Promise<boolean> => {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
@@ -91,36 +101,49 @@ export const RealtimeOCRDetector: React.FC = () => {
       });
 
       streamRef.current = stream;
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
 
       showNotification('屏幕捕获已启动', 'success');
+      return true;
     } catch (error) {
-      showNotification('屏幕捕获失败: ' + (error as Error).message, 'error');
+      const msg = (error as Error).name === 'NotAllowedError'
+        ? '用户取消了屏幕分享'
+        : (error as Error).message;
+      showNotification('屏幕捕获失败: ' + msg, 'error');
+      return false;
     }
   };
 
   // 开始实时检测
   const startDetection = async () => {
     if (!streamRef.current) {
-      await startCapture();
+      const ok = await startCapture();
+      if (!ok) return;
     }
 
-    if (!ocrProcessorRef.current) {
-      ocrProcessorRef.current = new EnhancedOCRProcessor();
-      await ocrProcessorRef.current.initialize();
+    if (ocrStatus !== 'ready') {
+      showNotification('OCR引擎尚未就绪，请稍候...', 'info');
+      if (ocrStatus === 'error') {
+        showNotification('OCR引擎初始化失败，请刷新页面重试', 'error');
+        return;
+      }
+      // 等待初始化完成
+      return;
     }
 
+    isDetectingRef.current = true;
     setIsDetecting(true);
     showNotification('实时检测已启动', 'success');
-    runDetectionLoop();
+    runDetectionLoopRef();
   };
 
   // 停止检测
   const stopDetection = () => {
+    isDetectingRef.current = false;
     setIsDetecting(false);
     if (detectionTimerRef.current) {
       clearTimeout(detectionTimerRef.current);
@@ -141,9 +164,13 @@ export const RealtimeOCRDetector: React.FC = () => {
     }
   };
 
-  // 检测循环
-  const runDetectionLoop = async () => {
-    if (!isDetecting || !videoRef.current || !canvasRef.current || !ocrProcessorRef.current) {
+  // 用 ref 保存检测循环函数，避免闭包陷阱
+  const runDetectionLoopRef = useCallback(async () => {
+    if (!isDetectingRef.current) return;
+    if (!videoRef.current || !canvasRef.current || !ocrProcessorRef.current) {
+      if (isDetectingRef.current) {
+        detectionTimerRef.current = setTimeout(runDetectionLoopRef, 500);
+      }
       return;
     }
 
@@ -153,18 +180,17 @@ export const RealtimeOCRDetector: React.FC = () => {
 
       canvasRef.current.width = videoRef.current.videoWidth;
       canvasRef.current.height = videoRef.current.videoHeight;
-      
+
       ctx.drawImage(videoRef.current, 0, 0);
 
-      for (let i = 0; i < detectionAreas.length; i++) {
-        const area = detectionAreas[i];
-        if (!area.enabled) continue;
+      for (const area of detectionAreas) {
+        if (!area.enabled || !isDetectingRef.current) break;
 
         const areaCanvas = document.createElement('canvas');
         areaCanvas.width = area.width;
         areaCanvas.height = area.height;
         const areaCtx = areaCanvas.getContext('2d');
-        
+
         if (areaCtx) {
           areaCtx.drawImage(
             canvasRef.current,
@@ -172,40 +198,42 @@ export const RealtimeOCRDetector: React.FC = () => {
             0, 0, area.width, area.height
           );
 
-          const result = await ocrProcessorRef.current.detectArea(
-            areaCanvas,
-            area.type
-          );
+          try {
+            const result = await ocrProcessorRef.current.detectArea(areaCanvas, area.type);
 
-          if (result.text.trim()) {
-            const newResult: OCRResult = {
-              text: result.text,
-              confidence: result.confidence,
-              area: area,
-              timestamp: Date.now(),
-              data: result.data
-            };
+            if (result.text.trim()) {
+              const newResult: OCRResult = {
+                text: result.text,
+                confidence: result.confidence,
+                area: area,
+                timestamp: Date.now(),
+                data: result.data,
+              };
 
-            setDetectionResults(prev => {
-              const updated = [...prev, newResult];
-              return updated.slice(-50);
-            });
+              setDetectionResults(prev => {
+                const updated = [...prev, newResult];
+                return updated.slice(-50);
+              });
 
-            if (result.data) {
-              const gameData = GameDataExtractor.extractGameData(result.data, area.type);
-              console.log('提取的游戏数据:', gameData);
-              updateGameData(gameData);
-              showNotification(`识别到 ${getTypeLabel(area.type)} 数据: ${result.text}`, 'success');
+              if (result.data) {
+                const gameData = GameDataExtractor.extractGameData(result.data, area.type);
+                console.log('提取的游戏数据:', gameData);
+                updateGameData(gameData);
+              }
             }
+          } catch (e) {
+            console.error('区域检测错误:', area.name, e);
           }
         }
       }
     } catch (error) {
-      console.error('检测错误:', error);
+      console.error('检测循环错误:', error);
     }
 
-    detectionTimerRef.current = setTimeout(runDetectionLoop, detectionInterval);
-  };
+    if (isDetectingRef.current) {
+      detectionTimerRef.current = setTimeout(runDetectionLoopRef, detectionInterval);
+    }
+  }, [detectionAreas, detectionInterval, updateGameData]);
 
   // 更新检测区域
   const updateArea = (index: number, updates: Partial<DetectionArea>) => {
