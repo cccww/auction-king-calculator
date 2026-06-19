@@ -49,6 +49,7 @@ export const RealtimeOCRDetector: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [ocrStatus, setOcrStatus] = useState<'idle' | 'initializing' | 'ready' | 'error'>('idle');
+  const [captureLoading, setCaptureLoading] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -94,26 +95,43 @@ export const RealtimeOCRDetector: React.FC = () => {
 
   // 启动屏幕捕获
   const startCapture = async (): Promise<boolean> => {
+    if (captureLoading) return false;
+    setCaptureLoading(true);
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
+        video: { displaySurface: 'monitor' },
         audio: false,
-      });
+        preferCurrentTab: false,
+      } as any);
 
       streamRef.current = stream;
+      stream.getVideoTracks()[0].onended = () => {
+        // 用户停止了屏幕分享（点击浏览器的"停止共享"）
+        stopDetection();
+        showNotification('屏幕分享已停止', 'info');
+      };
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
 
-      showNotification('屏幕捕获已启动', 'success');
+      showNotification('屏幕捕获已启动 ✅ 现在点击"开始检测"', 'success');
+      setCaptureLoading(false);
       return true;
     } catch (error) {
-      const msg = (error as Error).name === 'NotAllowedError'
-        ? '用户取消了屏幕分享'
-        : (error as Error).message;
-      showNotification('屏幕捕获失败: ' + msg, 'error');
+      setCaptureLoading(false);
+      const err = error as Error;
+      if (err.name === 'NotAllowedError') {
+        showNotification(
+          '⚠️ 屏幕分享被取消。请在弹出窗口中选择要捕获的窗口（游戏/BidKing），然后点击"允许"或"分享"',
+          'error'
+        );
+      } else if (err.name === 'NotFoundError') {
+        showNotification('⚠️ 未找到可捕获的屏幕内容，请确保有显示器/窗口可用', 'error');
+      } else {
+        showNotification('⚠️ 屏幕捕获失败: ' + err.message, 'error');
+      }
       return false;
     }
   };
@@ -328,23 +346,37 @@ export const RealtimeOCRDetector: React.FC = () => {
         </button>
       </div>
 
+      {/* 使用说明 */}
+      <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm text-blue-200 space-y-1">
+        <div className="font-medium text-blue-100 mb-1">📖 使用步骤：</div>
+        <div>1️⃣ 点击「📺 启动屏幕捕获」按钮</div>
+        <div>2️⃣ 在弹出的窗口中 <strong className="text-yellow-200">选择《竞拍之王》游戏窗口或整个屏幕</strong>，然后点击"分享"</div>
+        <div>3️⃣ 游戏画面显示后，点击「▶ 开始检测」自动识别</div>
+        <div className="text-blue-300/70 text-xs mt-1">💡 如果弹出窗口未出现，请检查浏览器是否阻止了弹窗</div>
+      </div>
+
       {/* 控制面板 */}
       <div className="flex gap-3 mb-6">
-        {!streamRef.current ? (
+        {captureLoading ? (
+          <button disabled className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg cursor-wait">
+            <Video className="w-4 h-4 animate-pulse" />
+            请选择窗口...
+          </button>
+        ) : !streamRef.current ? (
           <button
             onClick={startCapture}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-lg shadow-blue-600/30"
           >
             <Video className="w-4 h-4" />
-            启动屏幕捕获
+            📺 启动屏幕捕获
           </button>
         ) : !isDetecting ? (
           <button
             onClick={startDetection}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-lg shadow-green-600/30"
           >
             <Zap className="w-4 h-4" />
-            开始检测
+            ▶ 开始检测
           </button>
         ) : (
           <button
@@ -352,7 +384,7 @@ export const RealtimeOCRDetector: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
           >
             <StopCircle className="w-4 h-4" />
-            停止检测
+            ⏹ 停止检测
           </button>
         )}
 
