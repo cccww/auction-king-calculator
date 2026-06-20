@@ -9,82 +9,91 @@ interface AreaDetectionResult {
 
 // 颜色检测相关类
 export class ColorDetector {
+
+  // ========== 单像素颜色检测 ==========
+
+  static detectWhite(r: number, g: number, b: number): boolean {
+    return r > 200 && g > 200 && b > 200 && Math.abs(r - g) < 30 && Math.abs(g - b) < 30;
+  }
+
+  static detectGreen(r: number, g: number, b: number): boolean {
+    return g > 150 && r < 120 && b < 120 && g - r > 40 && g - b > 40;
+  }
+
+  static detectBlue(r: number, g: number, b: number): boolean {
+    return b > 150 && r < 120 && g < 150 && b - r > 40 && b - g > 30;
+  }
+
   static detectPurple(r: number, g: number, b: number): boolean {
-    // 紫色：R高，B高，G低
-    const isPurple = r > 120 && g < 100 && b > 120 && r - g > 30 && b - g > 30;
-    if (isPurple) {
-      logger.debug('COLOR', `检测到紫色像素: R=${r}, G=${g}, B=${b}`);
-    }
-    return isPurple;
+    return r > 120 && g < 100 && b > 120 && r - g > 30 && b - g > 30;
   }
 
   static detectGold(r: number, g: number, b: number): boolean {
-    // 金色：R高，G高，B低
-    const isGold = r > 150 && g > 120 && b < 100 && r - b > 50 && g - b > 30;
-    if (isGold) {
-      logger.debug('COLOR', `检测到金色像素: R=${r}, G=${g}, B=${b}`);
-    }
-    return isGold;
+    return r > 150 && g > 120 && b < 100 && r - b > 50 && g - b > 30;
   }
 
   static detectRed(r: number, g: number, b: number): boolean {
-    // 红色：R高，G低，B低
-    const isRed = r > 150 && g < 100 && b < 100 && r - g > 60 && r - b > 60;
-    if (isRed) {
-      logger.debug('COLOR', `检测到红色像素: R=${r}, G=${g}, B=${b}`);
-    }
-    return isRed;
+    return r > 150 && g < 100 && b < 100 && r - g > 60 && r - b > 60;
   }
 
-  static analyzeImageColors(canvas: HTMLCanvasElement): { purple: number; gold: number; red: number } {
+  /** 对所有6种品质做检测 */
+  static detectAll(r: number, g: number, b: number): string | null {
+    if (this.detectWhite(r, g, b)) return 'white';
+    if (this.detectGreen(r, g, b)) return 'green';
+    if (this.detectBlue(r, g, b)) return 'blue';
+    if (this.detectPurple(r, g, b)) return 'purple';
+    if (this.detectGold(r, g, b)) return 'gold';
+    if (this.detectRed(r, g, b)) return 'red';
+    return null;
+  }
+
+  // ========== 图像颜色分析 ==========
+
+  static analyzeImageColors(canvas: HTMLCanvasElement): Record<string, number> {
     const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      logger.error('COLOR', '无法获取Canvas上下文');
-      return { purple: 0, gold: 0, red: 0 };
-    }
+    if (!ctx) return { white: 0, green: 0, blue: 0, purple: 0, gold: 0, red: 0 };
 
     const width = Math.min(canvas.width, 100);
     const height = Math.min(canvas.height, 100);
-    
-    logger.info('COLOR', `开始分析图像颜色, 尺寸: ${width}x${height}`);
-    
     const imageData = ctx.getImageData(0, 0, width, height);
     const data = imageData.data;
 
-    let purpleCount = 0;
-    let goldCount = 0;
-    let redCount = 0;
-    let totalSampled = 0;
+    const counts: Record<string, number> = { white: 0, green: 0, blue: 0, purple: 0, gold: 0, red: 0 };
+    let total = 0;
 
-    // 采样像素（每隔几个像素采样一次）
     for (let i = 0; i < data.length; i += 16) {
-      totalSampled++;
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-
-      if (this.detectPurple(r, g, b)) purpleCount++;
-      if (this.detectGold(r, g, b)) goldCount++;
-      if (this.detectRed(r, g, b)) redCount++;
+      total++;
+      const q = this.detectAll(data[i], data[i + 1], data[i + 2]);
+      if (q) counts[q]++;
     }
 
-    const purpleRatio = purpleCount / totalSampled;
-    const goldRatio = goldCount / totalSampled;
-    const redRatio = redCount / totalSampled;
+    const ratios: Record<string, number> = {};
+    for (const k of Object.keys(counts)) {
+      ratios[k] = total > 0 ? counts[k] / total : 0;
+    }
+    return ratios;
+  }
 
-    logger.info('COLOR_DETECTION', '颜色分析结果', {
-      canvasSize: { width, height },
-      sampledPixels: totalSampled,
-      purple: { count: purpleCount, ratio: purpleRatio },
-      gold: { count: goldCount, ratio: goldRatio },
-      red: { count: redCount, ratio: redRatio }
-    });
+  /**
+   * 估算区域内各品质物品数量
+   * @param canvas 区域截图
+   * @param totalItemsHint 总件数提示(可选)
+   */
+  static countQualityItems(
+    canvas: HTMLCanvasElement,
+    totalItemsHint?: number,
+  ): Record<string, { ratio: number; estimatedCount?: number }> {
+    const ratios = this.analyzeImageColors(canvas);
+    const result: Record<string, { ratio: number; estimatedCount?: number }> = {};
 
-    return {
-      purple: purpleRatio,
-      gold: goldRatio,
-      red: redRatio
-    };
+    for (const [quality, ratio] of Object.entries(ratios)) {
+      result[quality] = {
+        ratio,
+        estimatedCount: totalItemsHint ? Math.round(totalItemsHint * ratio) : undefined,
+      };
+    }
+
+    return result;
   }
 }
 
@@ -148,11 +157,9 @@ export class EnhancedOCRProcessor {
 
     try {
       let dataUrl: string;
-      let colorAnalysis = { purple: 0, gold: 0, red: 0 };
-      
-      // 如果是 canvas，先转换为 dataUrl，同时进行颜色分析
+      let colorAnalysis: Record<string, number> = {};
+
       if (typeof canvasOrDataUrl !== 'string') {
-        logger.info('OCR', `分析Canvas颜色`);
         colorAnalysis = ColorDetector.analyzeImageColors(canvasOrDataUrl);
         logger.info('OCR_COLOR', `区域 ${areaType} 颜色分析:`, colorAnalysis);
         dataUrl = canvasOrDataUrl.toDataURL();
