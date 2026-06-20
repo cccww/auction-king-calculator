@@ -33,6 +33,7 @@ export const RealtimeOCRDetector: React.FC = () => {
   const [ocrStatus, setOcrStatus] = useState<'idle' | 'initializing' | 'ready' | 'error'>('idle');
   const [captureLoading, setCaptureLoading] = useState(false);
   const [ocrHistory, setOcrHistory] = useState<{ text: string; time: string }[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -273,6 +274,10 @@ export const RealtimeOCRDetector: React.FC = () => {
           {isPreviewVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           {isPreviewVisible ? '隐藏预览' : '显示预览'}
         </button>
+        <button onClick={() => setShowDebug(!showDebug)}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-xs">
+          {showDebug ? '隐藏调试' : '调试'}
+        </button>
       </div>
 
       {/* 主内容 */}
@@ -347,6 +352,23 @@ export const RealtimeOCRDetector: React.FC = () => {
                   切换到「计算器」标签，开启「精算模式」查看估值
                 </div>
               </div>
+            {showDebug && lastRawText && (
+              <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-600">
+                <h4 className="text-xs font-medium text-gray-400 mb-2">🔍 调试：原始OCR文本</h4>
+                <pre className="text-xs text-gray-300 whitespace-pre-wrap break-all max-h-48 overflow-y-auto">{lastRawText}</pre>
+                {parsedResults && (
+                  <>
+                    <h4 className="text-xs font-medium text-gray-400 mt-3 mb-2">📊 解析字段</h4>
+                    <div className="text-xs text-gray-300 space-y-1">
+                      {['T', 'B', 'WG', 'purpleAvg', 'purpleSlots', 'purpleCount', 'goldSlots', 'goldCount', 'goldAvg', 'redSlots', 'redCount', 'totalItems', 'price'].map(k => {
+                        const v = (parsedResults as any)[k];
+                        return v !== undefined ? <div key={k}><span className="text-gray-500">{k}:</span> {v}</div> : null;
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             </>
           ) : (
             <div className="text-center text-gray-500 py-12">
